@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="CinemaSystemAPI/CinemaSystemAPI.csproj" />
+  <Project Path="CinemaWeb/CinemaWeb.csproj" />
+</Solution>
