@@ -1,3 +1,4 @@
+using CinemaSystemAPI.Data;
 using CinemaSystemAPI.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,6 +8,9 @@ builder.Services.AddDbContext<CinemaDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("MyCnn")));
 
 var app = builder.Build();
+
+// Tự động seed dữ liệu mẫu khi khởi động ứng dụng
+DbInitializer.Initialize(app.Services);
 
 app.MapGet("/", () => "Hello World!");
 
