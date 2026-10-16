@@ -5,6 +5,7 @@ namespace CinemaSystemAPI.Services.Account
 {
     public interface IAccountRepository
     {
-        Task<bool> CreateUser (CreateUserDTO user);
+        Task<bool> CreateUser(CreateUserDTO user);
+        Task<User?> LoginUser(LoginDTO user);
     }
 }

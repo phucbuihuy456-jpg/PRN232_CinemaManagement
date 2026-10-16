@@ -36,5 +36,34 @@ namespace CinemaSystemAPI.Services.Account
                 return true;
             }
         }
+
+        public async Task<User?> LoginUser(LoginDTO user)
+        {
+            var checkExist = await _context.Users
+                .FirstOrDefaultAsync(u => u.Email == user.Email);
+            if (checkExist == null)
+            {
+                return null;
+            }
+            else
+            {
+                if (checkExist.IsActive == false)
+                {
+                    return null;
+                }
+                else
+                {
+                    bool isPasswordValid = BCrypt.Net.BCrypt.Verify(user.Password, checkExist.PasswordHash);
+                    if (!isPasswordValid)
+                    {
+                        return null;
+                    }
+                    else
+                    {
+                        return checkExist;
+                    }
+                }
+            }
+        }
     }
 }
