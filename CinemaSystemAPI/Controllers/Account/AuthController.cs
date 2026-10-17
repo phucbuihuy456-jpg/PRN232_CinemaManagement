@@ -1,4 +1,4 @@
-﻿using CinemaSystemAPI.DTOs.User;
+using CinemaSystemAPI.DTOs.User;
 using CinemaSystemAPI.Services;
 using CinemaSystemAPI.Services.Account;
 using Microsoft.AspNetCore.Authorization;
@@ -103,6 +103,31 @@ namespace CinemaSystemAPI.Controllers.Account
                         CreatedAt = updatedUser.CreatedAt
                     }
                 });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+        [Authorize]
+        [HttpPut("change-password")]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDTO passwordDTO)
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
+            {
+                return Unauthorized(new { message = "Token không hợp lệ!" });
+            }
+
+            try
+            {
+                var isSuccess = await _accountRepository.ChangePassword(userId, passwordDTO);
+                if (!isSuccess)
+                {
+                    return NotFound(new { message = "Không tìm thấy thông tin tài khoản!" });
+                }
+
+                return Ok(new { message = "Đổi mật khẩu thành công!" });
             }
             catch (Exception ex)
             {

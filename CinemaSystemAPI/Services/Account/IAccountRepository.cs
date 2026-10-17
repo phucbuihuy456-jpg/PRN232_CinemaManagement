@@ -9,5 +9,6 @@ namespace CinemaSystemAPI.Services.Account
         Task<User?> LoginUser(LoginDTO user);
         Task<User?> GetUserById(int id);
         Task<User?> UpdateUserById(int id, UpdateUserDTO user);
+        Task<bool> ChangePassword(int id, ChangePasswordDTO user);
     }
 }
