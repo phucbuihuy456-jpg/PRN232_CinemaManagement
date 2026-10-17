@@ -1,5 +1,4 @@
-﻿using CinemaSystemAPI.DTOs;
-using CinemaSystemAPI.DTOs.User;
+﻿using CinemaSystemAPI.DTOs.User;
 using CinemaSystemAPI.Services;
 using CinemaSystemAPI.Services.Account;
 using Microsoft.AspNetCore.Authorization;
@@ -74,6 +73,41 @@ namespace CinemaSystemAPI.Controllers.Account
                 CreatedAt = user.CreatedAt
             };
             return Ok(profile);
+        }
+        [Authorize]
+        [HttpPut("profile")]
+        public async Task<IActionResult> UpdateUser(UpdateUserDTO user)
+        {
+            var userIdCliam = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdCliam) || !int.TryParse(userIdCliam, out int userId))
+            {
+                return Unauthorized(new { message = "Token không hợp lệ" });
+            }
+            try
+            {
+                var updatedUser = await _accountRepository.UpdateUserById(userId, user);
+                if (updatedUser == null)
+                {
+                    return NotFound(new { message = "Không tìm thấy tài khoản!" });
+                }
+                return Ok(new
+                {
+                    message = "Cập nhật thông tin thành công!",
+                    data = new UserProfileDTO
+                    {
+                        Id = updatedUser.Id,
+                        FullName = updatedUser.FullName,
+                        Email = updatedUser.Email,
+                        PhoneNumber = updatedUser.PhoneNumber,
+                        Role = updatedUser.Role,
+                        CreatedAt = updatedUser.CreatedAt
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
     }
 }

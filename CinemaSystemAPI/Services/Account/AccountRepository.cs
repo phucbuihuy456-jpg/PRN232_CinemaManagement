@@ -78,5 +78,29 @@ namespace CinemaSystemAPI.Services.Account
                 }
             }
         }
+
+        public async Task<User?> UpdateUserById(int id, UpdateUserDTO user)
+        {
+            var checkUser = await _context.Users.FirstOrDefaultAsync(u => u.Id == id);
+            if (checkUser == null)
+            {
+                return null;
+            }
+            else
+            {
+                var emailExist = await _context.Users.AnyAsync(u => u.Email == user.Email && u.Id != id);
+                if (emailExist)
+                {
+                    throw new Exception("Email này đã được sử dụng bởi một tài khoản khác!");
+                }
+                checkUser.FullName = user.FullName;
+                checkUser.Email = user.Email;
+                checkUser.PhoneNumber = user.PhoneNumber;
+                checkUser.UpdatedAt = DateTime.Now;
+                _context.Users.Update(checkUser);
+                await _context.SaveChangesAsync();
+                return checkUser;
+            }
+        }
     }
 }

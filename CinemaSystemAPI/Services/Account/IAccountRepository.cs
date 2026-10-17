@@ -8,5 +8,6 @@ namespace CinemaSystemAPI.Services.Account
         Task<bool> CreateUser(CreateUserDTO user);
         Task<User?> LoginUser(LoginDTO user);
         Task<User?> GetUserById(int id);
+        Task<User?> UpdateUserById(int id, UpdateUserDTO user);
     }
 }
