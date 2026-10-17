@@ -1,4 +1,4 @@
-﻿using CinemaSystemAPI.DTOs;
+﻿using CinemaSystemAPI.DTOs.User;
 using CinemaSystemAPI.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -34,6 +34,19 @@ namespace CinemaSystemAPI.Services.Account
                 await _context.Users.AddAsync(newUser);
                 await _context.SaveChangesAsync();
                 return true;
+            }
+        }
+
+        public async Task<User?> GetUserById(int id)
+        {
+            var checkUser = await _context.Users.FirstOrDefaultAsync(u => u.Id == id);
+            if (checkUser == null)
+            {
+                return null;
+            }
+            else
+            {
+                return checkUser;
             }
         }
 

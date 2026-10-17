@@ -1,4 +1,4 @@
-﻿namespace CinemaSystemAPI.DTOs
+﻿namespace CinemaSystemAPI.DTOs.User
 {
     public class LoginDTO
     {

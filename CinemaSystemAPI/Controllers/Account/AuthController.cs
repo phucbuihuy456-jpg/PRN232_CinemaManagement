@@ -1,7 +1,10 @@
 ﻿using CinemaSystemAPI.DTOs;
+using CinemaSystemAPI.DTOs.User;
 using CinemaSystemAPI.Services;
 using CinemaSystemAPI.Services.Account;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace CinemaSystemAPI.Controllers.Account
 {
@@ -46,6 +49,31 @@ namespace CinemaSystemAPI.Controllers.Account
                     role = existingUser.Role
                 });
             }
+        }
+        [Authorize]
+        [HttpGet("me")]
+        public async Task<IActionResult> GetUser()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
+            {
+                return Unauthorized(new { message = "Token không hợp lệ!" });
+            }
+            var user = await _accountRepository.GetUserById(userId);
+            if (user == null)
+            {
+                return NotFound(new { message = "Không tìm thấy thông tin người dùng" });
+            }
+            var profile = new UserProfileDTO
+            {
+                Id = user.Id,
+                FullName = user.FullName,
+                Email = user.Email,
+                PhoneNumber = user.PhoneNumber,
+                Role = user.Role,
+                CreatedAt = user.CreatedAt
+            };
+            return Ok(profile);
         }
     }
 }

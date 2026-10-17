@@ -1,4 +1,4 @@
-﻿using CinemaSystemAPI.DTOs;
+﻿using CinemaSystemAPI.DTOs.User;
 using CinemaSystemAPI.Models;
 
 namespace CinemaSystemAPI.Services.Account
@@ -7,5 +7,6 @@ namespace CinemaSystemAPI.Services.Account
     {
         Task<bool> CreateUser(CreateUserDTO user);
         Task<User?> LoginUser(LoginDTO user);
+        Task<User?> GetUserById(int id);
     }
 }
