@@ -24,5 +24,6 @@ namespace CinemaSystemAPI.Models
         public virtual Room Room { get; set; } = null!;
         public virtual SeatType SeatType { get; set; } = null!;
         public virtual ICollection<BookingSeat> BookingSeats { get; set; } = new List<BookingSeat>();
+        public virtual ICollection<SeatHold> SeatHolds { get; set; } = new List<SeatHold>();
     }
 }

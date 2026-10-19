@@ -21,6 +21,7 @@ namespace CinemaSystemAPI.Models
         public DbSet<Combo> Combos { get; set; } = null!;
         public DbSet<BookingCombo> BookingCombos { get; set; } = null!;
         public DbSet<Payment> Payments { get; set; } = null!;
+        public DbSet<SeatHold> SeatHolds { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -195,6 +196,32 @@ namespace CinemaSystemAPI.Models
                 e.HasOne(x => x.Booking)
                     .WithMany(b => b.Payments)
                     .HasForeignKey(x => x.BookingId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ===== SeatHolds =====
+            modelBuilder.Entity<SeatHold>(e =>
+            {
+                e.Property(x => x.HeldAt).HasDefaultValueSql("GETDATE()");
+
+                // Hỗ trợ truy vấn nhanh các ghế đang bị giữ theo suất chiếu và thời gian hết hạn
+                e.HasIndex(x => new { x.ShowtimeId, x.SeatId });
+                e.HasIndex(x => x.ExpiresAt);
+
+                e.HasOne(x => x.Showtime)
+                    .WithMany(s => s.SeatHolds)
+                    .HasForeignKey(x => x.ShowtimeId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(x => x.Seat)
+                    .WithMany(s => s.SeatHolds)
+                    .HasForeignKey(x => x.SeatId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(x => x.User)
+                    .WithMany(u => u.SeatHolds)
+                    .HasForeignKey(x => x.UserId)
+                    .IsRequired(false)
                     .OnDelete(DeleteBehavior.Restrict);
             });
         }
