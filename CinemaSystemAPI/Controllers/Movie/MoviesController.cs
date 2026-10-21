@@ -21,5 +21,15 @@ namespace CinemaSystemAPI.Controllers.Movie
         {
             return Ok(_movieRepository.GetMovies());
         }
+        [HttpGet("api/movies/{id}")]
+        public async Task<IActionResult> GetMovieById(int id)
+        {
+            var movie = await _movieRepository.GetMovieById(id);
+            if (movie == null)
+            {
+                return NotFound(new { message = "Không tìm thấy phim với ID này!" });
+            }
+            return Ok(movie);
+        }
     }
 }
