@@ -1,5 +1,6 @@
 using CinemaSystemAPI.Data;
 using CinemaSystemAPI.Models;
+using CinemaSystemAPI.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -18,16 +19,19 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddDbContext<CinemaDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("MyCnn")));
 
+// Register Background Services (Task 8: ExpiredSeatHoldCleanupService chạy mỗi 30s)
+builder.Services.AddHostedService<ExpiredSeatHoldCleanupService>();
+
 var app = builder.Build();
 
-// Seed initial combo data if empty
+// Seed initial master data (Combos, SeatTypes, Rooms, Seats, Movies, Showtimes)
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<CinemaDbContext>();
     DbInitializer.SeedData(context);
 }
 
-// Configure the HTTP request pipeline.
+// Configure HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
