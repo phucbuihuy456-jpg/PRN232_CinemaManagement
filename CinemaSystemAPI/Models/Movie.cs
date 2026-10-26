@@ -24,11 +24,9 @@ namespace CinemaSystemAPI.Models
         // CHECK > 0
         public int DurationMinutes { get; set; }
 
-        [Column(TypeName = "date")]
         public DateOnly ReleaseDate { get; set; }
 
         // CHECK >= ReleaseDate
-        [Column(TypeName = "date")]
         public DateOnly EndDate { get; set; }
 
         [Column(TypeName = "varchar(500)")]
