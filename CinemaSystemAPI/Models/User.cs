@@ -37,5 +37,6 @@ namespace CinemaSystemAPI.Models
         public DateTime? UpdatedAt { get; set; }
 
         public virtual ICollection<Booking> Bookings { get; set; } = new List<Booking>();
+        public virtual ICollection<SeatHold> SeatHolds { get; set; } = new List<SeatHold>();
     }
 }

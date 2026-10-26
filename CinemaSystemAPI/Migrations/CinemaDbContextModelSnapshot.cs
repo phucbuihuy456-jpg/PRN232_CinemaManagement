@@ -384,6 +384,48 @@ namespace CinemaSystemAPI.Migrations
                     b.ToTable("Seats");
                 });
 
+            modelBuilder.Entity("CinemaSystemAPI.Models.SeatHold", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime");
+
+                    b.Property<DateTime>("HeldAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasDefaultValueSql("GETDATE()");
+
+                    b.Property<int>("SeatId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SessionId")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<int>("ShowtimeId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("SeatId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("ShowtimeId", "SeatId");
+
+                    b.ToTable("SeatHolds");
+                });
+
             modelBuilder.Entity("CinemaSystemAPI.Models.SeatType", b =>
                 {
                     b.Property<int>("Id")
@@ -609,6 +651,32 @@ namespace CinemaSystemAPI.Migrations
                     b.Navigation("SeatType");
                 });
 
+            modelBuilder.Entity("CinemaSystemAPI.Models.SeatHold", b =>
+                {
+                    b.HasOne("CinemaSystemAPI.Models.Seat", "Seat")
+                        .WithMany("SeatHolds")
+                        .HasForeignKey("SeatId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CinemaSystemAPI.Models.Showtime", "Showtime")
+                        .WithMany("SeatHolds")
+                        .HasForeignKey("ShowtimeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CinemaSystemAPI.Models.User", "User")
+                        .WithMany("SeatHolds")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Seat");
+
+                    b.Navigation("Showtime");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("CinemaSystemAPI.Models.Showtime", b =>
                 {
                     b.HasOne("CinemaSystemAPI.Models.Movie", "Movie")
@@ -664,6 +732,8 @@ namespace CinemaSystemAPI.Migrations
             modelBuilder.Entity("CinemaSystemAPI.Models.Seat", b =>
                 {
                     b.Navigation("BookingSeats");
+
+                    b.Navigation("SeatHolds");
                 });
 
             modelBuilder.Entity("CinemaSystemAPI.Models.SeatType", b =>
@@ -674,11 +744,15 @@ namespace CinemaSystemAPI.Migrations
             modelBuilder.Entity("CinemaSystemAPI.Models.Showtime", b =>
                 {
                     b.Navigation("Bookings");
+
+                    b.Navigation("SeatHolds");
                 });
 
             modelBuilder.Entity("CinemaSystemAPI.Models.User", b =>
                 {
                     b.Navigation("Bookings");
+
+                    b.Navigation("SeatHolds");
                 });
 #pragma warning restore 612, 618
         }
