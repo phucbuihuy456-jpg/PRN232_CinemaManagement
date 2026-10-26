@@ -9,11 +9,62 @@ namespace CinemaSystemAPI.Data
         {
             using var scope = serviceProvider.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<CinemaDbContext>();
+            SeedData(context);
+        }
 
-            // Đảm bảo Database đã được tạo
+        public static void SeedData(CinemaDbContext context)
+        {
             context.Database.EnsureCreated();
 
-            // Nếu đã có dữ liệu SeatTypes thì coi như DB đã được seed
+            // Đảm bảo bảng SeatHolds tồn tại trong CSDL (nếu DB đã tạo trước khi có tính năng của Bách)
+            try
+            {
+                context.Database.ExecuteSqlRaw(@"
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'SeatHolds')
+BEGIN
+    CREATE TABLE [dbo].[SeatHolds] (
+        [Id] INT IDENTITY(1,1) NOT NULL,
+        [ShowtimeId] INT NOT NULL,
+        [SeatId] INT NOT NULL,
+        [UserId] INT NULL,
+        [SessionId] VARCHAR(100) NULL,
+        [HeldAt] DATETIME NOT NULL DEFAULT (GETDATE()),
+        [ExpiresAt] DATETIME NOT NULL,
+        CONSTRAINT [PK_SeatHolds] PRIMARY KEY CLUSTERED ([Id] ASC),
+        CONSTRAINT [FK_SeatHolds_Seats_SeatId] FOREIGN KEY ([SeatId]) REFERENCES [dbo].[Seats] ([Id]),
+        CONSTRAINT [FK_SeatHolds_Showtimes_ShowtimeId] FOREIGN KEY ([ShowtimeId]) REFERENCES [dbo].[Showtimes] ([Id]) ON DELETE CASCADE,
+        CONSTRAINT [FK_SeatHolds_Users_UserId] FOREIGN KEY ([UserId]) REFERENCES [dbo].[Users] ([Id])
+    );
+END");
+            }
+            catch { }
+
+            // Đảm bảo luôn có 1 bản ghi SeatHold mẫu (ghế B7) để test sơ đồ ghế
+            try
+            {
+                if (!context.SeatHolds.Any())
+                {
+                    var st = context.Showtimes.FirstOrDefault();
+                    if (st != null)
+                    {
+                        var targetSeat = context.Seats.FirstOrDefault(s => s.RoomId == st.RoomId && s.RowCode == "B" && s.SeatNumber == 7);
+                        if (targetSeat != null)
+                        {
+                            context.SeatHolds.Add(new SeatHold
+                            {
+                                ShowtimeId = st.Id,
+                                SeatId = targetSeat.Id,
+                                SessionId = "demo_session_123",
+                                HeldAt = DateTime.Now,
+                                ExpiresAt = DateTime.Now.AddMinutes(5)
+                            });
+                            context.SaveChanges();
+                        }
+                    }
+                }
+            }
+            catch { }
+
             if (context.SeatTypes.Any())
             {
                 return;
@@ -23,8 +74,8 @@ namespace CinemaSystemAPI.Data
             var seatTypes = new List<SeatType>
             {
                 new SeatType { Name = "Standard", ExtraPrice = 0 },
-                new SeatType { Name = "VIP", ExtraPrice = 15000 },
-                new SeatType { Name = "Couple", ExtraPrice = 30000 }
+                new SeatType { Name = "VIP", ExtraPrice = 20000 },
+                new SeatType { Name = "Couple", ExtraPrice = 40000 }
             };
             context.SeatTypes.AddRange(seatTypes);
             context.SaveChanges();
@@ -68,15 +119,21 @@ namespace CinemaSystemAPI.Data
 
             var seats = new List<Seat>();
 
-            // Sinh ghế cho Phòng 1 (30 ghế: Hàng A, B là Standard (mỗi hàng 10 ghế), Hàng C là VIP (10 ghế))
+            // Phòng 1 (30 ghế): Hàng A (Standard 1-10), Hàng B (VIP 1-10), Hàng C (Couple 1-10, C10 bảo trì IsActive = false)
             for (int i = 1; i <= 10; i++)
             {
                 seats.Add(new Seat { RoomId = room1.Id, RowCode = "A", SeatNumber = i, SeatTypeId = standardType.Id, IsActive = true });
-                seats.Add(new Seat { RoomId = room1.Id, RowCode = "B", SeatNumber = i, SeatTypeId = standardType.Id, IsActive = true });
-                seats.Add(new Seat { RoomId = room1.Id, RowCode = "C", SeatNumber = i, SeatTypeId = vipType.Id, IsActive = true });
+            }
+            for (int i = 1; i <= 10; i++)
+            {
+                seats.Add(new Seat { RoomId = room1.Id, RowCode = "B", SeatNumber = i, SeatTypeId = vipType.Id, IsActive = true });
+            }
+            for (int i = 1; i <= 10; i++)
+            {
+                seats.Add(new Seat { RoomId = room1.Id, RowCode = "C", SeatNumber = i, SeatTypeId = coupleType.Id, IsActive = i != 10 });
             }
 
-            // Sinh ghế cho Phòng 2 IMAX (20 ghế: Hàng A, B là VIP (mỗi hàng 8 ghế), Hàng C là Couple (4 ghế đôi))
+            // Phòng 2 IMAX (20 ghế)
             for (int i = 1; i <= 8; i++)
             {
                 seats.Add(new Seat { RoomId = room2.Id, RowCode = "A", SeatNumber = i, SeatTypeId = vipType.Id, IsActive = true });
@@ -221,7 +278,16 @@ namespace CinemaSystemAPI.Data
                 IsActive = true
             };
 
-            context.Combos.AddRange(comboSolo, comboCouple, comboFamily);
+            var comboVip = new Combo
+            {
+                Name = "Combo VIP Caramel Cheese",
+                Description = "1 Bắp phô mai/caramel lớn + 2 Nước ép hoa quả",
+                Price = 139000,
+                ImageUrl = "https://images.unsplash.com/photo-1512149673953-1e251807ec7c?w=500",
+                IsActive = true
+            };
+
+            context.Combos.AddRange(comboSolo, comboCouple, comboFamily, comboVip);
             context.SaveChanges();
 
             // 9. SHOWTIMES
@@ -259,7 +325,7 @@ namespace CinemaSystemAPI.Data
             context.Showtimes.AddRange(showtime1, showtime2, showtime3);
             context.SaveChanges();
 
-            // 10. SAMPLE BOOKING (Đơn đặt vé mẫu hoàn tất)
+            // 10. SAMPLE BOOKING (Đơn đặt vé mẫu hoàn tất: Ghế B5, B6)
             var bookedSeat1 = seats.First(s => s.RoomId == room1.Id && s.RowCode == "B" && s.SeatNumber == 5);
             var bookedSeat2 = seats.First(s => s.RoomId == room1.Id && s.RowCode == "B" && s.SeatNumber == 6);
 
@@ -267,7 +333,7 @@ namespace CinemaSystemAPI.Data
             {
                 UserId = customerUser.Id,
                 ShowtimeId = showtime1.Id,
-                TotalAmount = (showtime1.BasePrice * 2) + comboSolo.Price, // 2 vé Standard + 1 Combo Solo
+                TotalAmount = (showtime1.BasePrice * 2) + comboSolo.Price,
                 Status = "Confirmed",
                 PaymentStatus = "Paid",
                 QrCodeToken = Guid.NewGuid().ToString("N")
@@ -301,7 +367,18 @@ namespace CinemaSystemAPI.Data
                 GatewayResponse = "{\"status\": \"SUCCESS\", \"bank\": \"MOMO\"}",
                 PaidAt = DateTime.Now
             });
+            context.SaveChanges();
 
+            // 11. SAMPLE SEAT HOLD (Ghế B7 giữ tạm 5 phút - Tính năng SeatHold của Bách)
+            var heldSeat = seats.First(s => s.RoomId == room1.Id && s.RowCode == "B" && s.SeatNumber == 7);
+            context.SeatHolds.Add(new SeatHold
+            {
+                ShowtimeId = showtime1.Id,
+                SeatId = heldSeat.Id,
+                SessionId = "demo_session_123",
+                HeldAt = DateTime.Now,
+                ExpiresAt = DateTime.Now.AddMinutes(5)
+            });
             context.SaveChanges();
         }
     }

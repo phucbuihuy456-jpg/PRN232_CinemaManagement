@@ -1,0 +1,189 @@
+@model CinemaWeb.Models.SeatMapViewModel
+@{
+    ViewData["Title"] = "Sơ đồ ghế - " + Model.MovieTitle;
+    var rows = Model.Seats.GroupBy(s => s.RowCode).OrderBy(g => g.Key).ToList();
+}
+
+<div class="container py-4">
+    <!-- Movie & Showtime Info Banner -->
+    <div class="cinema-banner p-4 mb-4 shadow">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="badge bg-danger me-2 px-3 py-1 fs-6">ĐANG CHIẾU</span>
+                    <span class="badge bg-dark border border-secondary text-info px-3 py-1 fs-6">@Model.ScreenType</span>
+                </div>
+                <h2 class="fw-bold text-white mb-2">
+                    <i class="bi bi-camera-reels-fill text-danger me-2"></i>@Model.MovieTitle
+                </h2>
+                <div class="text-secondary small d-flex flex-wrap gap-4 mt-2">
+                    <span><i class="bi bi-door-open-fill text-warning me-1"></i> @Model.RoomName</span>
+                    <span><i class="bi bi-clock-fill text-warning me-1"></i> @Model.StartTime.ToString("dd/MM/yyyy HH:mm") - @Model.EndTime.ToString("HH:mm")</span>
+                    <span><i class="bi bi-tag-fill text-warning me-1"></i> Giá vé gốc: <strong class="text-light">@Model.BasePrice.ToString("N0") đ</strong></span>
+                </div>
+            </div>
+            <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                <div class="text-secondary small">
+                    Ghế khả dụng: <strong class="text-success fs-5">@Model.AvailableCount</strong> / @Model.TotalSeats
+                </div>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+        {
+            <div class="alert alert-info py-2 px-3 mt-3 mb-0 small">
+                <i class="bi bi-info-circle-fill me-1"></i> @Model.ErrorMessage
+            </div>
+        }
+    </div>
+
+    <!-- Seat Map Main Box -->
+    <div class="seat-map-wrapper">
+        <!-- Curved Screen -->
+        <div class="screen-container">
+            <div class="cinema-screen"></div>
+            <div class="screen-text">
+                <i class="bi bi-display me-1"></i> MÀN HÌNH CHIẾU / SCREEN
+            </div>
+        </div>
+
+        <!-- Seats Grid -->
+        <div class="seat-grid-container mb-4">
+            @foreach (var row in rows)
+            {
+                <div class="seat-row">
+                    <!-- Row Label Left -->
+                    <span class="row-label">@row.Key</span>
+
+                    <!-- Row Seats -->
+                    @foreach (var seat in row.OrderBy(s => s.SeatNumber))
+                    {
+                        var typeClass = seat.SeatTypeName switch
+                        {
+                            "VIP" => "seat-type-vip",
+                            "Couple" => "seat-type-couple",
+                            _ => "seat-type-standard"
+                        };
+
+                        var statusClass = seat.Status switch
+                        {
+                            "Sold" => "seat-sold",
+                            "Held" => "seat-held",
+                            "Disabled" => "seat-disabled",
+                            _ => ""
+                        };
+
+                        var isDisabled = seat.Status != "Available" ? "disabled" : "";
+                        var tooltip = $"{seat.SeatName} - {seat.SeatTypeName} - {seat.FinalPrice:N0} đ ({seat.Status})";
+
+                        <button type="button"
+                                class="seat-btn @typeClass @statusClass"
+                                data-seat-id="@seat.SeatId"
+                                data-seat-name="@seat.SeatName"
+                                data-price="@seat.FinalPrice"
+                                data-status="@seat.Status"
+                                data-type="@seat.SeatTypeName"
+                                title="@tooltip"
+                                @isDisabled>
+                            @if (seat.Status == "Sold")
+                            {
+                                <i class="bi bi-x-lg"></i>
+                            }
+                            else if (seat.Status == "Disabled")
+                            {
+                                <i class="bi bi-slash-circle"></i>
+                            }
+                            else if (seat.SeatTypeName == "Couple")
+                            {
+                                <span><i class="bi bi-heart-fill me-1 small"></i>@seat.SeatName</span>
+                            }
+                            else
+                            {
+                                <span>@seat.SeatNumber</span>
+                            }
+                        </button>
+                    }
+
+                    <!-- Row Label Right -->
+                    <span class="row-label">@row.Key</span>
+                </div>
+            }
+        </div>
+
+        <hr class="border-secondary my-4" />
+
+        <!-- Legend (Chú thích màu sắc loại ghế và trạng thái) -->
+        <div class="row g-3 justify-content-center text-center">
+            <!-- Loại ghế -->
+            <div class="col-auto">
+                <div class="legend-item">
+                    <span class="legend-sample seat-type-standard"></span>
+                    <span>Ghế Thường (@Model.BasePrice.ToString("N0") đ)</span>
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="legend-item">
+                    <span class="legend-sample seat-type-vip"></span>
+                    <span>Ghế VIP (@((Model.BasePrice + 20000).ToString("N0")) đ)</span>
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="legend-item">
+                    <span class="legend-sample seat-type-couple sample-couple"></span>
+                    <span>Ghế Couple (@((Model.BasePrice + 40000).ToString("N0")) đ)</span>
+                </div>
+            </div>
+
+            <!-- Trạng thái ghế -->
+            <div class="col-auto">
+                <div class="legend-item">
+                    <span class="legend-sample" style="background:#10b981; border: 1px solid #34d399;"></span>
+                    <span>Đang chọn</span>
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="legend-item">
+                    <span class="legend-sample seat-held"></span>
+                    <span>Đang giữ chỗ</span>
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="legend-item">
+                    <span class="legend-sample seat-sold"></span>
+                    <span>Đã bán</span>
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="legend-item">
+                    <span class="legend-sample seat-disabled"></span>
+                    <span>Bảo trì</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Booking Summary Bottom Bar -->
+    <div class="summary-card p-4 mt-4 shadow-lg">
+        <div class="row align-items-center">
+            <div class="col-lg-6 mb-3 mb-lg-0">
+                <div class="fw-semibold text-secondary small mb-1">GHẾ ĐÃ CHỌN:</div>
+                <div id="selectedSeatsList" class="d-flex flex-wrap gap-2">
+                    <span class="text-secondary small fst-italic">Chưa có ghế nào được chọn</span>
+                </div>
+            </div>
+            <div class="col-lg-3 col-sm-6 text-lg-end mb-3 mb-lg-0">
+                <div class="text-secondary small">Tổng số ghế: <strong id="selectedCount" class="text-light fs-6">0</strong></div>
+                <div class="text-secondary small">Tạm tính: <strong id="totalPrice" class="text-warning fs-4 fw-bold">0 đ</strong></div>
+            </div>
+            <div class="col-lg-3 col-sm-6 text-end">
+                <button id="btnContinue" type="button" class="btn btn-danger btn-lg w-100 fw-bold px-4" disabled>
+                    Tiếp tục <i class="bi bi-arrow-right ms-1"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/seat-map.js"></script>
+}

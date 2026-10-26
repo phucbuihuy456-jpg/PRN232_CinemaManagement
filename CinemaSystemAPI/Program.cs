@@ -13,6 +13,7 @@ using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// 1. Add Controllers & OData
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -22,8 +23,11 @@ builder.Services.AddControllers()
         options.Select().Filter().OrderBy().Expand().Count().SetMaxTop(100)
     );
 
+// 2. Cấu hình DbContext
 builder.Services.AddDbContext<CinemaDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("MyCnn")));
+
+// 3. Swagger với cấu hình Bearer Token
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -51,45 +55,58 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 });
-builder.Services.AddAuthentication(
-    options =>
+
+// 4. Authentication & JWT
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
     {
-        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-    }
-)
-.AddJwtBearer(
-    options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(
-                    builder.Configuration["Jwt:Key"]!
-                )
-            )
-        };
-    }
-);
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)
+        )
+    };
+});
 builder.Services.AddAuthorization();
+
+// 5. Dependency Injection Services
 builder.Services.AddSingleton<JwtService>();
 builder.Services.AddScoped<IAccountRepository, AccountRepository>();
 builder.Services.AddScoped<IMovieRepository, MovieRepository>();
+
+// 6. Background Services (Task của Bách: tự động dọn dẹp giữ ghế hết hạn)
+builder.Services.AddHostedService<ExpiredSeatHoldCleanupService>();
+
 var app = builder.Build();
 
-// Tự động seed dữ liệu mẫu khi khởi động ứng dụng
+// 7. Seed dữ liệu mẫu khi khởi động ứng dụng
 DbInitializer.Initialize(app.Services);
+
+// 8. Cấu hình HTTP Request Pipeline (Thứ tự chuẩn ASP.NET Core)
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseStaticFiles();
+
+app.UseRouting();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapGet("/", () => "Hello World!");
 app.MapControllers();
-app.UseAuthentication();
-app.UseAuthorization();
-app.UseSwagger();
-app.UseSwaggerUI();
+
 app.Run();
