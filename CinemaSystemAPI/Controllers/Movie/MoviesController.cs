@@ -77,5 +77,25 @@ namespace CinemaSystemAPI.Controllers.Movie
                 return BadRequest(new { message = ex.Message });
             }
         }
+
+        [Authorize(Roles = "Admin")]
+        [HttpDelete("api/movies/{id}")]
+        public async Task<IActionResult> DeleteMovie(int id)
+        {
+            try
+            {
+                var isSuccess = await _movieRepository.DeleteMovie(id);
+                if (!isSuccess)
+                {
+                    return NotFound(new { message = $"Không tìm thấy bộ phim có ID = {id} hoặc phim đã bị xóa trước đó!" });
+                }
+
+                return Ok(new { message = "Xóa mềm phim thành công!" });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
     }
 }

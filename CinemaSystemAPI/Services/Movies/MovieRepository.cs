@@ -160,5 +160,31 @@ namespace CinemaSystemAPI.Services.Movies
             await _context.SaveChangesAsync();
             return checkExist;
         }
+
+        public async Task<bool> DeleteMovie(int id)
+        {
+            var movie = await _context.Movies.FirstOrDefaultAsync(m => m.Id == id && !m.IsDeleted);
+            if (movie == null)
+            {
+                return false;
+            }
+
+            // Kiểm tra ràng buộc: Phim có suất chiếu trong tương lai đang mở bán không
+            bool hasFutureShowtimes = await _context.Showtimes
+                .AnyAsync(s => s.MovieId == id && s.StartTime > DateTime.Now && s.IsActive);
+
+            if (hasFutureShowtimes)
+            {
+                throw new InvalidOperationException("Không thể xóa phim vì đang có suất chiếu trong tương lai! Vui lòng hủy các suất chiếu trước.");
+            }
+
+            // Thực hiện Xóa mềm (Soft Delete)
+            movie.IsDeleted = true;
+            movie.UpdatedAt = DateTime.Now;
+
+            _context.Movies.Update(movie);
+            await _context.SaveChangesAsync();
+            return true;
+        }
     }
 }

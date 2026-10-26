@@ -9,5 +9,6 @@ namespace CinemaSystemAPI.Services.Movies
         Task<MovieDTO?> GetMovieById(int id);
         Task<Movie?> CreateMovie(CreateMovieDTO movie);
         Task<Movie?> UpdateMovie(int id, UpdateMovieDTO movie);
+        Task<bool> DeleteMovie(int id);
     }
 }
