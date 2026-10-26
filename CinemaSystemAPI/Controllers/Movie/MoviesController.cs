@@ -1,7 +1,6 @@
 using CinemaSystemAPI.DTOs.Movies;
 using CinemaSystemAPI.Services.Movies;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Query;
 
@@ -24,6 +23,7 @@ namespace CinemaSystemAPI.Controllers.Movie
         {
             return Ok(_movieRepository.GetMovies());
         }
+
         [HttpGet("api/movies/{id}")]
         public async Task<IActionResult> GetMovieById(int id)
         {
@@ -34,16 +34,48 @@ namespace CinemaSystemAPI.Controllers.Movie
             }
             return Ok(movie);
         }
+
         [Authorize(Roles = "Admin")]
         [HttpPost("api/movies")]
         public async Task<IActionResult> CreateMovie(CreateMovieDTO movieDto)
         {
-            var createdMovie = await _movieRepository.CreateMovie(movieDto);
-            if (createdMovie == null)
+            try
             {
-                return BadRequest(new { message = "Dữ liệu phim không hợp lệ (Thời lượng, ngày chiếu hoặc độ tuổi sai quy định)!" });
+                var createdMovie = await _movieRepository.CreateMovie(movieDto);
+                if (createdMovie == null)
+                {
+                    return BadRequest(new { message = "Không thể tạo phim!" });
+                }
+                return CreatedAtAction(nameof(GetMovieById), new { id = createdMovie.Id }, createdMovie);
             }
-            return CreatedAtAction(nameof(GetMovieById), new { id = createdMovie.Id }, createdMovie);
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPut("api/movies/{id}")]
+        public async Task<IActionResult> UpdateMovie(int id, [FromBody] UpdateMovieDTO movieDto)
+        {
+            try
+            {
+                var updatedMovie = await _movieRepository.UpdateMovie(id, movieDto);
+                if (updatedMovie == null)
+                {
+                    return NotFound(new { message = $"Không tìm thấy bộ phim có ID = {id}!" });
+                }
+
+                return Ok(new
+                {
+                    message = "Cập nhật thông tin phim thành công!",
+                    data = updatedMovie
+                });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
     }
 }

@@ -8,5 +8,6 @@ namespace CinemaSystemAPI.Services.Movies
         IQueryable<Movie> GetMovies();
         Task<MovieDTO?> GetMovieById(int id);
         Task<Movie?> CreateMovie(CreateMovieDTO movie);
+        Task<Movie?> UpdateMovie(int id, UpdateMovieDTO movie);
     }
 }
