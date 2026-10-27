@@ -312,5 +312,112 @@ namespace CinemaSystemAPI.Controllers
 
             return CreatedAtAction(nameof(GetShowtimeById), new { id = newShowtime.Id }, newShowtime);
         }
+        [Authorize(Roles = "Admin")]
+        [HttpPut("{id:int}")]
+        public async Task<ActionResult<Showtime>> UpdateShowTime(int id, UpdateShowTimeDto showTime)
+        {
+            // 1. TÌM SUẤT CHIẾU CẦN SỬA TRƯỚC TIÊN
+            var existingShowtime = await _context.Showtimes.FirstOrDefaultAsync(s => s.Id == id && s.IsActive);
+            if (existingShowtime == null)
+            {
+                return NotFound(new { message = $"Không tìm thấy suất chiếu với ID = {id}" });
+            }
+
+            // 2. Không cho phép sửa suất chiếu đã hoặc đang diễn ra
+            if (existingShowtime.StartTime < DateTime.Now)
+            {
+                return BadRequest(new { message = "Không thể chỉnh sửa suất chiếu đã hoặc đang diễn ra!" });
+            }
+
+            // 3. Kiểm tra nếu đã có vé bán thì không cho đổi Phim hoặc Phòng chiếu
+            bool hasTicketsSold = await _context.BookingSeats.AnyAsync(bs =>
+                bs.Booking.ShowtimeId == id &&
+                (bs.Booking.Status == "Confirmed" || bs.Booking.Status == "Completed" || bs.Booking.PaymentStatus == "Paid")
+            );
+
+            if (hasTicketsSold)
+            {
+                if (existingShowtime.MovieId != showTime.MovieId || existingShowtime.RoomId != showTime.RoomId)
+                {
+                    return BadRequest(new
+                    {
+                        message = "Suất chiếu này đã có khách mua vé, không thể thay đổi Phim hoặc Phòng chiếu!"
+                    });
+                }
+            }
+
+            // 4. Validate thời gian & giá vé
+            if (showTime.StartTime <= DateTime.Now)
+            {
+                return BadRequest(new { message = "Thời gian bắt đầu suất chiếu phải ở tương lai." });
+            }
+
+            if (showTime.EndTime <= showTime.StartTime)
+            {
+                return BadRequest(new { message = "Thời gian kết thúc phải lớn hơn thời gian bắt đầu." });
+            }
+
+            if (showTime.BasePrice < 0)
+            {
+                return BadRequest(new { message = "Giá vé cơ sở không được âm." });
+            }
+
+            // 5. Kiểm tra Phim (SỬA LẠI: dùng showTime.MovieId)
+            var checkMovie = await _context.Movies.FirstOrDefaultAsync(m => m.Id == showTime.MovieId && !m.IsDeleted);
+            if (checkMovie == null)
+            {
+                return BadRequest(new { message = $"Phim với ID = {showTime.MovieId} không tồn tại hoặc không hoạt động." });
+            }
+
+            // 6. Kiểm tra thời lượng phim
+            if (showTime.EndTime < showTime.StartTime.AddMinutes(checkMovie.DurationMinutes))
+            {
+                return BadRequest(new
+                {
+                    message = $"Khoảng thời gian chiếu không đủ cho bộ phim này (Thời lượng phim: {checkMovie.DurationMinutes} phút)."
+                });
+            }
+
+            // 7. Kiểm tra ngày chiếu trong khoảng phát hành của phim
+            var showDate = DateOnly.FromDateTime(showTime.StartTime);
+            if (showDate < checkMovie.ReleaseDate || showDate > checkMovie.EndDate)
+            {
+                return BadRequest(new { message = $"Ngày chiếu không nằm trong khoảng phát hành của phim ({checkMovie.ReleaseDate} - {checkMovie.EndDate})." });
+            }
+
+            // 8. Kiểm tra phòng chiếu
+            var checkRoom = await _context.Rooms.FirstOrDefaultAsync(r => r.Id == showTime.RoomId && r.IsActive);
+            if (checkRoom == null)
+            {
+                return BadRequest(new { message = $"Phòng chiếu với ID = {showTime.RoomId} không tồn tại hoặc không hoạt động." });
+            }
+
+            // 9. Validate trùng giờ (có loại trừ chính nó: s.Id != id)
+            bool isOverlapped = await _context.Showtimes.AnyAsync(s =>
+                s.RoomId == showTime.RoomId &&
+                s.IsActive &&
+                s.Id != id &&
+                showTime.StartTime < s.EndTime &&
+                showTime.EndTime > s.StartTime
+            );
+
+            if (isOverlapped)
+            {
+                return BadRequest(new
+                {
+                    message = "Phòng chiếu này đã có suất chiếu khác trong khoảng thời gian đã chọn! Vui lòng chọn giờ hoặc phòng khác."
+                });
+            }
+
+            // 10. Cập nhật dữ liệu
+            existingShowtime.MovieId = showTime.MovieId;
+            existingShowtime.RoomId = showTime.RoomId;
+            existingShowtime.StartTime = showTime.StartTime;
+            existingShowtime.EndTime = showTime.EndTime;
+            existingShowtime.BasePrice = showTime.BasePrice;
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Cập nhật suất chiếu thành công!" });
+        }
     }
 }
