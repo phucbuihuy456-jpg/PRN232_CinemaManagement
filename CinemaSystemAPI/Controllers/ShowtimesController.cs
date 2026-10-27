@@ -190,5 +190,42 @@ namespace CinemaSystemAPI.Controllers
 
             return Ok(list);
         }
+        [HttpGet("{id:int}")]
+        public async Task<ActionResult<ShowTimeDetailDto>> GetShowtimeById(int id)
+        {
+            var showtime = await _context.Showtimes
+                .Include(s => s.Movie)
+                .Include(s => s.Room)
+                .Where(s => s.Id == id && s.IsActive)
+                .Select(s => new ShowTimeDetailDto
+                {
+                    Id = s.Id,
+                    StartTime = s.StartTime,
+                    EndTime = s.EndTime,
+                    BasePrice = s.BasePrice,
+                    IsActive = s.IsActive,
+                    MovieId = s.MovieId,
+                    Title = s.Movie.Title,
+                    PosterUrl = s.Movie.PosterUrl,
+                    AgeRating = s.Movie.AgeRating,
+                    DurationMinutes = s.Movie.DurationMinutes,
+                    Language = s.Movie.Language,
+                    RoomId = s.RoomId,
+                    RoomName = s.Room.Name,
+                    ScreenType = s.Room.ScreenType,
+                    TotalSeats = _context.Seats.Count(seat => seat.RoomId == s.RoomId),
+                    AvailableSeats = _context.Seats.Count(seat => seat.RoomId == s.RoomId && seat.IsActive) -
+                                     _context.BookingSeats.Count(bs => bs.Booking.ShowtimeId == s.Id &&
+                                                                       (bs.Booking.Status == "Confirmed" ||
+                                                                        bs.Booking.Status == "Completed" ||
+                                                                        bs.Booking.PaymentStatus == "Paid"))
+                })
+                .FirstOrDefaultAsync();
+            if (showtime == null)
+            {
+                return NotFound(new { message = $"Không tìm thấy suất chiếu với ID = {id}" });
+            }
+            return Ok(showtime);
+        }
     }
 }
