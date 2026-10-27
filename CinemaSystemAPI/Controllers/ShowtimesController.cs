@@ -419,5 +419,43 @@ namespace CinemaSystemAPI.Controllers
             await _context.SaveChangesAsync();
             return Ok(new { message = "Cập nhật suất chiếu thành công!" });
         }
+        [Authorize(Roles = "Admin")]
+        [HttpDelete("{id:int}")]
+        public async Task<ActionResult<Showtime>> DeleteShowTime(int id)
+        {
+            var checkShowTime = await _context.Showtimes
+                .Include(s => s.SeatHolds)
+                .FirstOrDefaultAsync(s => s.Id == id && s.IsActive == true);
+            if (checkShowTime == null)
+            {
+                return NotFound(new { message = "Không tìm thấy showtime" });
+            }
+            if (checkShowTime.StartTime <= DateTime.Now)
+            {
+                return BadRequest(new { message = "Không thể xóa suất chiếu đã/đang diễn ra" });
+            }
+            bool hasTicketsSold = await _context.BookingSeats.AnyAsync(bs =>
+        bs.Booking.ShowtimeId == id &&
+        (bs.Booking.Status == "Confirmed" ||
+         bs.Booking.Status == "Completed" ||
+         bs.Booking.PaymentStatus == "Paid")
+    );
+            if (hasTicketsSold)
+            {
+                return BadRequest(new
+                {
+                    message = "Suất chiếu này đã có khách hàng mua vé, không thể xóa! Vui lòng xử lý hủy vé/hoàn tiền trước."
+                });
+            }
+            // 4. Dọn dẹp các ghế đang được giữ tạm (nếu có ai đang chọn ghế dở dang)
+            if (checkShowTime.SeatHolds != null && checkShowTime.SeatHolds.Any())
+            {
+                _context.SeatHolds.RemoveRange(checkShowTime.SeatHolds);
+            }
+            // 5. Thực hiện xóa mềm (Soft Delete)
+            checkShowTime.IsActive = false;
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Xóa suất chiếu thành công!" });
+        }
     }
 }
