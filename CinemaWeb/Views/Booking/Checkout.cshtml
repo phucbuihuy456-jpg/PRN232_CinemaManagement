@@ -1,0 +1,440 @@
+@model CinemaWeb.Models.CheckoutViewModel
+@{
+    ViewData["Title"] = "Chọn Combo & Thanh toán - " + Model.MovieTitle;
+}
+
+<div class="container py-4">
+    <!-- Breadcrumb & Top Bar -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <a asp-action="SeatMap" asp-route-id="@Model.ShowtimeId" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i> Quay lại chọn ghế
+        </a>
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-secondary small">Bước 2 / 2:</span>
+            <span class="badge bg-danger">Chọn Combo & Thanh Toán</span>
+        </div>
+    </div>
+
+    <!-- Countdown Timer Banner (Task 20 & 21) -->
+    <div class="cinema-banner p-3 mb-4 shadow border border-warning-subtle">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div class="d-flex align-items-center">
+                <i class="bi bi-stopwatch text-warning fs-3 me-3"></i>
+                <div>
+                    <div class="text-secondary small text-uppercase fw-semibold">Thời gian giữ ghế còn lại:</div>
+                    <div class="text-white small">Vui lòng hoàn tất thanh toán trước khi ghế được tự động giải phóng.</div>
+                </div>
+            </div>
+            <div>
+                <span id="checkoutTimer" class="badge bg-danger fs-4 px-4 py-2 font-monospace shadow">
+                    05:00
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- LEFT COLUMN: Combos Selection & Customer Form -->
+        <div class="col-lg-7">
+            <!-- 1. CHỌN COMBO BẮP NƯỚC (Task 21) -->
+            <div class="card bg-dark border-secondary mb-4 shadow">
+                <div class="card-header bg-black border-secondary py-3">
+                    <h5 class="fw-bold text-white mb-0">
+                        <i class="bi bi-cup-straw text-danger me-2"></i>1. Chọn Bắp & Nước (Ưu đãi đặc biệt)
+                    </h5>
+                </div>
+                <div class="card-body p-3">
+                    <div class="row g-3">
+                        @foreach (var combo in Model.AvailableCombos)
+                        {
+                            <div class="col-md-6">
+                                <div class="combo-card p-3 rounded border border-secondary h-100 d-flex flex-column justify-content-between bg-black bg-opacity-50">
+                                    <div class="d-flex gap-3 mb-2">
+                                        <img src="@(string.IsNullOrEmpty(combo.ImageUrl) ? "https://images.unsplash.com/photo-1585647347384-2593bc35786b?w=200" : combo.ImageUrl)"
+                                             alt="@combo.Name"
+                                             class="rounded shadow-sm"
+                                             style="width: 75px; height: 75px; object-fit: cover;" />
+                                        <div>
+                                            <h6 class="fw-bold text-light mb-1">@combo.Name</h6>
+                                            <p class="text-secondary small mb-1" style="font-size: 0.8rem; line-height: 1.3;">
+                                                @combo.Description
+                                            </p>
+                                            <div class="text-warning fw-bold">@combo.Price.ToString("N0") đ</div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center pt-2 border-top border-secondary border-opacity-50 mt-auto">
+                                        <span class="text-secondary small">Số lượng:</span>
+                                        <div class="input-group input-group-sm" style="width: 110px;">
+                                            <button type="button" class="btn btn-outline-secondary btn-combo-minus" data-combo-id="@combo.Id">-</button>
+                                            <input type="text"
+                                                   class="form-control text-center bg-dark text-white border-secondary combo-qty-input"
+                                                   id="combo-qty-@combo.Id"
+                                                   data-combo-id="@combo.Id"
+                                                   data-combo-name="@combo.Name"
+                                                   data-combo-price="@combo.Price"
+                                                   value="0"
+                                                   readonly />
+                                            <button type="button" class="btn btn-outline-secondary btn-combo-plus" data-combo-id="@combo.Id">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. THÔNG TIN KHÁCH HÀNG (Task 21) -->
+            <div class="card bg-dark border-secondary mb-4 shadow">
+                <div class="card-header bg-black border-secondary py-3">
+                    <h5 class="fw-bold text-white mb-0">
+                        <i class="bi bi-person-fill text-danger me-2"></i>2. Thông tin nhận vé
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-semibold">Họ và tên <span class="text-danger">*</span></label>
+                            <input type="text" id="custName" class="form-control bg-black text-white border-secondary" placeholder="Ví dụ: Nguyễn Văn A" value="@Model.CustomerName" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-semibold">Số điện thoại <span class="text-danger">*</span></label>
+                            <input type="tel" id="custPhone" class="form-control bg-black text-white border-secondary" placeholder="Ví dụ: 0912345678" value="@Model.CustomerPhone" required />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label text-secondary small fw-semibold">Email nhận vé & Mã QR <span class="text-danger">*</span></label>
+                            <input type="email" id="custEmail" class="form-control bg-black text-white border-secondary" placeholder="Ví dụ: khachhang@gmail.com" value="@Model.CustomerEmail" required />
+                            <div class="form-text text-secondary small">Vé điện tử và mã QR check-in sẽ được gửi tới email này.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. PHƯƠNG THỨC THANH TOÁN (Task 21 & Task 22) -->
+            <div class="card bg-dark border-secondary mb-4 shadow">
+                <div class="card-header bg-black border-secondary py-3">
+                    <h5 class="fw-bold text-white mb-0">
+                        <i class="bi bi-credit-card-2-front-fill text-danger me-2"></i>3. Chọn phương thức thanh toán
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="d-flex flex-column gap-3">
+                        <label class="payment-method-card p-3 rounded border border-secondary d-flex align-items-center cursor-pointer bg-black bg-opacity-50">
+                            <input type="radio" name="paymentMethod" value="EWallet" class="form-check-input me-3" checked />
+                            <i class="bi bi-wallet2 text-danger fs-4 me-3"></i>
+                            <div>
+                                <div class="text-white fw-bold">Ví điện tử (MoMo / ZaloPay / ShopeePay)</div>
+                                <div class="text-secondary small">Quét mã QR thanh toán nhanh chóng và an toàn</div>
+                            </div>
+                        </label>
+
+                        <label class="payment-method-card p-3 rounded border border-secondary d-flex align-items-center cursor-pointer bg-black bg-opacity-50">
+                            <input type="radio" name="paymentMethod" value="BankTransfer" class="form-check-input me-3" />
+                            <i class="bi bi-bank text-info fs-4 me-3"></i>
+                            <div>
+                                <div class="text-white fw-bold">Chuyển khoản Ngân hàng / VNPay QR</div>
+                                <div class="text-secondary small">Hỗ trợ tất cả ngân hàng nội địa Napas 24/7</div>
+                            </div>
+                        </label>
+
+                        <label class="payment-method-card p-3 rounded border border-secondary d-flex align-items-center cursor-pointer bg-black bg-opacity-50">
+                            <input type="radio" name="paymentMethod" value="CreditCard" class="form-check-input me-3" />
+                            <i class="bi bi-credit-card text-warning fs-4 me-3"></i>
+                            <div>
+                                <div class="text-white fw-bold">Thẻ Quốc tế (Visa, MasterCard, JCB)</div>
+                                <div class="text-secondary small">Miễn phí giao dịch thẻ quốc tế</div>
+                            </div>
+                        </label>
+
+                        <label class="payment-method-card p-3 rounded border border-secondary d-flex align-items-center cursor-pointer bg-black bg-opacity-50">
+                            <input type="radio" name="paymentMethod" value="Cash" class="form-check-input me-3" />
+                            <i class="bi bi-cash-stack text-success fs-4 me-3"></i>
+                            <div>
+                                <div class="text-white fw-bold">Tiền mặt tại quầy POS (Dành cho Thu ngân)</div>
+                                <div class="text-secondary small">Thanh toán trực tiếp bằng tiền mặt khi bán vé tại rạp</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: Order Summary (Tóm tắt đơn hàng) -->
+        <div class="col-lg-5">
+            <div class="card bg-dark border-secondary shadow sticky-top" style="top: 20px;">
+                <div class="card-header bg-black border-secondary py-3">
+                    <h5 class="fw-bold text-white mb-0">
+                        <i class="bi bi-receipt text-danger me-2"></i>Tóm tắt đơn hàng
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <!-- Movie Details -->
+                    <div class="d-flex gap-3 pb-3 border-bottom border-secondary mb-3">
+                        <img src="@(string.IsNullOrEmpty(Model.PosterUrl) ? "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=200" : Model.PosterUrl)"
+                             alt="@Model.MovieTitle"
+                             class="rounded shadow"
+                             style="width: 70px; height: 100px; object-fit: cover;" />
+                        <div>
+                            <span class="badge bg-secondary mb-1">@Model.ScreenType</span>
+                            <h6 class="fw-bold text-white mb-1">@Model.MovieTitle</h6>
+                            <div class="text-secondary small">
+                                <i class="bi bi-door-open text-warning me-1"></i> @Model.RoomName
+                            </div>
+                            <div class="text-secondary small">
+                                <i class="bi bi-clock text-warning me-1"></i> @Model.StartTime.ToString("dd/MM/yyyy HH:mm")
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Seats Breakdown -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between text-secondary small fw-semibold mb-2">
+                            <span>GHẾ ĐÃ CHỌN (@Model.SelectedSeats.Count):</span>
+                            <span>GIÁ TIỀN</span>
+                        </div>
+                        <div class="d-flex flex-column gap-1">
+                            @foreach (var seat in Model.SelectedSeats)
+                            {
+                                <div class="d-flex justify-content-between small">
+                                    <span class="text-light">
+                                        <i class="bi bi-ticket-perforated text-danger me-1"></i>
+                                        Ghế <strong>@seat.SeatName</strong> (@seat.SeatTypeName)
+                                    </span>
+                                    <span class="text-light fw-semibold">@seat.FinalPrice.ToString("N0") đ</span>
+                                </div>
+                            }
+                        </div>
+                        <div class="d-flex justify-content-between pt-2 mt-2 border-top border-secondary border-opacity-50 small">
+                            <span class="text-secondary">Tổng tiền vé:</span>
+                            <strong class="text-white" id="subtotalSeats">@Model.TotalSeatPrice.ToString("N0") đ</strong>
+                        </div>
+                    </div>
+
+                    <!-- Combos Breakdown -->
+                    <div class="mb-3 pt-3 border-top border-secondary">
+                        <div class="d-flex justify-content-between text-secondary small fw-semibold mb-2">
+                            <span>BẮP & NƯỚC:</span>
+                            <span>THÀNH TIỀN</span>
+                        </div>
+                        <div id="summaryComboList" class="d-flex flex-column gap-1">
+                            <div class="text-secondary small fst-italic" id="emptyComboNotice">Chưa chọn combo nào</div>
+                        </div>
+                        <div class="d-flex justify-content-between pt-2 mt-2 border-top border-secondary border-opacity-50 small">
+                            <span class="text-secondary">Tổng tiền combo:</span>
+                            <strong class="text-white" id="subtotalCombos">0 đ</strong>
+                        </div>
+                    </div>
+
+                    <!-- Total Amount & Checkout Button -->
+                    <div class="pt-3 border-top border-secondary border-2 mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-uppercase fw-bold text-secondary">Tổng thanh toán:</span>
+                            <span id="grandTotal" class="text-warning fs-3 fw-bold">@Model.TotalSeatPrice.ToString("N0") đ</span>
+                        </div>
+                        <div class="text-secondary text-end small mb-3">(Đã bao gồm VAT và phụ thu dịch vụ)</div>
+
+                        <button type="button" id="btnSubmitCheckout" class="btn btn-danger btn-lg w-100 fw-bold py-3 shadow">
+                            <i class="bi bi-shield-lock-fill me-2"></i> Xác nhận & Thanh toán
+                        </button>
+                    </div>
+
+                    <div class="alert alert-dark border-secondary p-2 small mb-0 text-secondary text-center">
+                        <i class="bi bi-check-circle-fill text-success me-1"></i> Giao dịch bảo mật 256-bit SSL với Database Transaction chống trùng ghế tuyệt đối.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/countdown-timer.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const showtimeId = @Model.ShowtimeId;
+            const holdToken = '@Model.HoldToken';
+            const selectedSeatIds = [@string.Join(",", Model.SelectedSeats.Select(s => s.SeatId))];
+            const baseSeatTotal = @Model.TotalSeatPrice;
+
+            const timerEl = document.getElementById('checkoutTimer');
+            const subtotalCombosEl = document.getElementById('subtotalCombos');
+            const grandTotalEl = document.getElementById('grandTotal');
+            const summaryComboList = document.getElementById('summaryComboList');
+            const emptyComboNotice = document.getElementById('emptyComboNotice');
+            const btnSubmitCheckout = document.getElementById('btnSubmitCheckout');
+
+            // Quản lý số lượng combo đã chọn
+            const selectedCombos = new Map(); // comboId -> { id, name, price, qty }
+
+            // Khởi động đồng hồ đếm ngược 5 phút
+            if (typeof CountdownTimer !== 'undefined') {
+                const hasSessionTimer = CountdownTimer.initFromSession(
+                    function onTick(seconds, formatted) {
+                        if (timerEl) {
+                            timerEl.textContent = formatted;
+                            if (seconds <= 60) {
+                                timerEl.classList.remove('bg-danger');
+                                timerEl.classList.add('bg-warning', 'text-dark');
+                            }
+                        }
+                    },
+                    function onExpired() {
+                        alert('Thời gian giữ ghế (5 phút) đã hết! Ghế của bạn đã được hệ thống giải phóng. Vui lòng quay lại chọn ghế.');
+                        window.location.href = `/Booking/SeatMap/${showtimeId}`;
+                    }
+                );
+
+                if (!hasSessionTimer) {
+                    CountdownTimer.start(300,
+                        function onTick(seconds, formatted) {
+                            if (timerEl) timerEl.textContent = formatted;
+                        },
+                        function onExpired() {
+                            alert('Thời gian giữ ghế (5 phút) đã hết! Ghế của bạn đã được giải phóng.');
+                            window.location.href = `/Booking/SeatMap/${showtimeId}`;
+                        }
+                    );
+                }
+            }
+
+            // Xử lý nút tăng giảm combo
+            document.querySelectorAll('.btn-combo-plus').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const comboId = parseInt(this.getAttribute('data-combo-id'), 10);
+                    const input = document.getElementById(`combo-qty-${comboId}`);
+                    if (!input) return;
+
+                    let currentVal = parseInt(input.value || '0', 10);
+                    if (currentVal < 99) {
+                        currentVal++;
+                        input.value = currentVal;
+                        updateComboSelection(comboId, input, currentVal);
+                    }
+                });
+            });
+
+            document.querySelectorAll('.btn-combo-minus').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const comboId = parseInt(this.getAttribute('data-combo-id'), 10);
+                    const input = document.getElementById(`combo-qty-${comboId}`);
+                    if (!input) return;
+
+                    let currentVal = parseInt(input.value || '0', 10);
+                    if (currentVal > 0) {
+                        currentVal--;
+                        input.value = currentVal;
+                        updateComboSelection(comboId, input, currentVal);
+                    }
+                });
+            });
+
+            function updateComboSelection(comboId, input, qty) {
+                const name = input.getAttribute('data-combo-name');
+                const price = parseFloat(input.getAttribute('data-combo-price') || '0');
+
+                if (qty > 0) {
+                    selectedCombos.set(comboId, { id: comboId, name: name, price: price, qty: qty });
+                } else {
+                    selectedCombos.delete(comboId);
+                }
+
+                renderComboSummary();
+            }
+
+            function renderComboSummary() {
+                let comboTotal = 0;
+                summaryComboList.innerHTML = '';
+
+                if (selectedCombos.size === 0) {
+                    summaryComboList.appendChild(emptyComboNotice);
+                } else {
+                    selectedCombos.forEach(item => {
+                        const itemTotal = item.price * item.qty;
+                        comboTotal += itemTotal;
+
+                        const row = document.createElement('div');
+                        row.className = 'd-flex justify-content-between small';
+                        row.innerHTML = `
+                            <span class="text-light">
+                                <i class="bi bi-cup text-warning me-1"></i>
+                                ${item.name} <strong>x${item.qty}</strong>
+                            </span>
+                            <span class="text-light fw-semibold">${new Intl.NumberFormat('vi-VN').format(itemTotal)} đ</span>
+                        `;
+                        summaryComboList.appendChild(row);
+                    });
+                }
+
+                subtotalCombosEl.textContent = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(comboTotal);
+                const grandTotal = baseSeatTotal + comboTotal;
+                grandTotalEl.textContent = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(grandTotal);
+            }
+
+            // Xử lý nút xác nhận thanh toán -> Gọi API Checkout (Task 22)
+            if (btnSubmitCheckout) {
+                btnSubmitCheckout.addEventListener('click', async function () {
+                    const custName = document.getElementById('custName').value.trim();
+                    const custPhone = document.getElementById('custPhone').value.trim();
+                    const custEmail = document.getElementById('custEmail').value.trim();
+
+                    if (!custName || !custPhone || !custEmail) {
+                        alert('Vui lòng điền đầy đủ Họ tên, Số điện thoại và Email nhận vé.');
+                        return;
+                    }
+
+                    const selectedPaymentRadio = document.querySelector('input[name="paymentMethod"]:checked');
+                    const paymentMethod = selectedPaymentRadio ? selectedPaymentRadio.value : 'EWallet';
+
+                    // Chuẩn bị danh sách combos
+                    const combosPayload = [];
+                    selectedCombos.forEach(c => {
+                        combosPayload.push({ comboId: c.id, quantity: c.qty });
+                    });
+
+                    const checkoutPayload = {
+                        showtimeId: showtimeId,
+                        holdToken: holdToken,
+                        seatIds: selectedSeatIds,
+                        combos: combosPayload,
+                        paymentMethod: paymentMethod,
+                        customerName: custName,
+                        customerPhone: custPhone,
+                        customerEmail: custEmail
+                    };
+
+                    const originalBtnHtml = btnSubmitCheckout.innerHTML;
+                    btnSubmitCheckout.disabled = true;
+                    btnSubmitCheckout.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Đang xử lý giao dịch...';
+
+                    try {
+                        const res = await fetch('/Booking/ProcessCheckout', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(checkoutPayload)
+                        });
+
+                        const data = await res.json();
+
+                        if (res.ok) {
+                            // Xóa session giữ ghế
+                            if (typeof CountdownTimer !== 'undefined') {
+                                CountdownTimer.clearSession();
+                            }
+                            // Chuyển hướng tới trang đặt vé thành công
+                            window.location.href = `/Booking/Success?bookingId=${data.bookingId}`;
+                        } else {
+                            alert(data.message || 'Thanh toán không thành công. Vui lòng kiểm tra lại!');
+                            btnSubmitCheckout.disabled = false;
+                            btnSubmitCheckout.innerHTML = originalBtnHtml;
+                        }
+                    } catch (err) {
+                        console.error('Lỗi khi gọi API checkout:', err);
+                        alert('Đã xảy ra lỗi kết nối tới cổng thanh toán. Giao dịch đã được hoàn tác an toàn.');
+                        btnSubmitCheckout.disabled = false;
+                        btnSubmitCheckout.innerHTML = originalBtnHtml;
+                    }
+                });
+            }
+        });
+    </script>
+}
