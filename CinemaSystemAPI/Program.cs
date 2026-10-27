@@ -1,37 +1,98 @@
 using CinemaSystemAPI.Data;
 using CinemaSystemAPI.Models;
 using CinemaSystemAPI.Services;
+using CinemaSystemAPI.Services.Account;
+using CinemaSystemAPI.Services.Movies;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.OData;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using System.Text;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add Controllers
-builder.Services.AddControllers();
+// 1. Add Controllers & OData
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+    })
+    .AddOData(options =>
+        options.Select().Filter().OrderBy().Expand().Count().SetMaxTop(100)
+    );
 
-// Add Swagger / OpenAPI
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new() { Title = "CinemaSystemAPI", Version = "v1" });
-});
-
-// Configure DbContext
+// 2. Cấu hình DbContext
 builder.Services.AddDbContext<CinemaDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("MyCnn")));
 
-// Register Background Services (Task 8: ExpiredSeatHoldCleanupService chạy mỗi 30s)
+// 3. Swagger với cấu hình Bearer Token
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "CinemaSystemAPI", Version = "v1" });
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Description = "Nhập token theo định dạng: Bearer {token}",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
+    });
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
+
+// 4. Authentication & JWT
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)
+        )
+    };
+});
+builder.Services.AddAuthorization();
+
+// 5. Dependency Injection Services
+builder.Services.AddSingleton<JwtService>();
+builder.Services.AddScoped<IAccountRepository, AccountRepository>();
+builder.Services.AddScoped<IMovieRepository, MovieRepository>();
+
+// 6. Background Services (Task của Bách: tự động dọn dẹp giữ ghế hết hạn)
 builder.Services.AddHostedService<ExpiredSeatHoldCleanupService>();
 
 var app = builder.Build();
 
-// Seed initial master data (Combos, SeatTypes, Rooms, Seats, Movies, Showtimes)
-using (var scope = app.Services.CreateScope())
-{
-    var context = scope.ServiceProvider.GetRequiredService<CinemaDbContext>();
-    DbInitializer.SeedData(context);
-}
+// 7. Seed dữ liệu mẫu khi khởi động ứng dụng
+DbInitializer.Initialize(app.Services);
 
-// Configure HTTP request pipeline
+// 8. Cấu hình HTTP Request Pipeline (Thứ tự chuẩn ASP.NET Core)
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -40,8 +101,12 @@ if (app.Environment.IsDevelopment())
 
 app.UseStaticFiles();
 
+app.UseRouting();
+
+app.UseAuthentication();
 app.UseAuthorization();
 
+app.MapGet("/", () => "Hello World!");
 app.MapControllers();
 
 app.Run();
