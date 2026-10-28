@@ -24,8 +24,13 @@
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                         <li class="nav-item">
-                            <a class="nav-link active" asp-controller="Booking" asp-action="SeatMap">
+                            <a class="nav-link" asp-controller="Booking" asp-action="SeatMap">
                                 <i class="bi bi-grid-3x3-gap-fill me-1"></i> Sơ đồ ghế (Seat Map)
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-warning fw-semibold" asp-controller="Pos" asp-action="Index">
+                                <i class="bi bi-display me-1"></i> Bán vé POS (Staff)
                             </a>
                         </li>
                     </ul>

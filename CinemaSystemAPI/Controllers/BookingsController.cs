@@ -12,6 +12,8 @@ namespace CinemaSystemAPI.Controllers
     {
         private readonly CinemaDbContext _context;
         private readonly ILogger<BookingsController> _logger;
+        // Khóa đồng bộ hóa chống Race Condition khi 2 người cùng chọn 1 ghế tại cùng 1 mili-giây (Task 33)
+        private static readonly SemaphoreSlim _holdLock = new(1, 1);
 
         public BookingsController(CinemaDbContext context, ILogger<BookingsController> logger)
         {
@@ -20,9 +22,9 @@ namespace CinemaSystemAPI.Controllers
         }
 
         /// <summary>
-        /// Task 19: Giữ ghế tạm trong vòng 5 phút (Hold Seats API).
+        /// Task 19 & Task 33: Giữ ghế tạm trong vòng 5 phút (Hold Seats API).
         /// Kiểm tra ghế trống -> Thêm bản ghi vào SeatHolds với ExpiresAt = NOW + 5 phút.
-        /// Trả về 409 Conflict nếu ghế đã bán hoặc đang bị người khác giữ.
+        /// Chống Race Condition: Trả về 409 Conflict cho người thứ 2 nếu 2 người cùng chọn 1 ghế tại 1 mili-giây.
         /// </summary>
         /// <param name="request">Thông tin suất chiếu và danh sách ID ghế cần giữ</param>
         /// <returns>HoldToken và thời gian hết hạn (ExpiresAt)</returns>
@@ -39,128 +41,137 @@ namespace CinemaSystemAPI.Controllers
                 return BadRequest(new { message = "Mỗi lượt đặt vé chỉ được chọn tối đa 8 ghế." });
             }
 
-            // 1. Kiểm tra suất chiếu tồn tại và đang hoạt động
-            var showtime = await _context.Showtimes
-                .Include(s => s.Room)
-                .FirstOrDefaultAsync(s => s.Id == request.ShowtimeId && s.IsActive);
-
-            if (showtime == null)
+            // Đồng bộ hóa critical section để xử lý xung đột mili-giây tuyệt đối (Task 33)
+            await _holdLock.WaitAsync();
+            try
             {
-                return NotFound(new { message = $"Không tìm thấy suất chiếu với ID = {request.ShowtimeId}" });
+                // 1. Kiểm tra suất chiếu tồn tại và đang hoạt động
+                var showtime = await _context.Showtimes
+                    .Include(s => s.Room)
+                    .FirstOrDefaultAsync(s => s.Id == request.ShowtimeId && s.IsActive);
+
+                if (showtime == null)
+                {
+                    return NotFound(new { message = $"Không tìm thấy suất chiếu với ID = {request.ShowtimeId}" });
+                }
+
+                if (showtime.EndTime <= DateTime.Now)
+                {
+                    return BadRequest(new { message = "Suất chiếu này đã kết thúc, không thể thực hiện giữ ghế." });
+                }
+
+                // 2. Lấy thông tin các ghế từ CSDL và kiểm tra thuộc phòng chiếu
+                var targetSeats = await _context.Seats
+                    .Include(s => s.SeatType)
+                    .Where(s => request.SeatIds.Contains(s.Id) && s.RoomId == showtime.RoomId && s.IsActive)
+                    .ToListAsync();
+
+                if (targetSeats.Count != request.SeatIds.Distinct().Count())
+                {
+                    return BadRequest(new { message = "Một số ghế được chọn không tồn tại hoặc không thuộc phòng chiếu của suất chiếu này." });
+                }
+
+                // 3. Kiểm tra các ghế đã được bán chưa (Booking có trạng thái Confirmed, Completed hoặc Paid)
+                var soldSeats = await _context.BookingSeats
+                    .Include(bs => bs.Seat)
+                    .Where(bs => bs.Booking.ShowtimeId == request.ShowtimeId &&
+                                 request.SeatIds.Contains(bs.SeatId) &&
+                                 (bs.Booking.Status == "Confirmed" ||
+                                  bs.Booking.Status == "Completed" ||
+                                  bs.Booking.PaymentStatus == "Paid"))
+                    .Select(bs => $"{bs.Seat.RowCode}{bs.Seat.SeatNumber}")
+                    .ToListAsync();
+
+                if (soldSeats.Any())
+                {
+                    var seatListStr = string.Join(", ", soldSeats);
+                    return Conflict(new { message = $"Ghế [{seatListStr}] đã được bán thành công cho khách hàng khác. Vui lòng chọn ghế khác." });
+                }
+
+                // 4. Kiểm tra các ghế đang bị người khác giữ tạm (SeatHolds còn hạn)
+                var now = DateTime.Now;
+                var heldQuery = _context.SeatHolds
+                    .Include(h => h.Seat)
+                    .Where(h => h.ShowtimeId == request.ShowtimeId &&
+                                request.SeatIds.Contains(h.SeatId) &&
+                                h.ExpiresAt > now);
+
+                // Nếu client gửi kèm HoldToken trước đó, bỏ qua ghế thuộc chính session này (cho phép gia hạn/đổi ghế)
+                if (!string.IsNullOrEmpty(request.HoldToken))
+                {
+                    heldQuery = heldQuery.Where(h => h.SessionId != request.HoldToken);
+                }
+
+                var conflictingHolds = await heldQuery
+                    .Select(h => $"{h.Seat.RowCode}{h.Seat.SeatNumber}")
+                    .ToListAsync();
+
+                if (conflictingHolds.Any())
+                {
+                    var heldStr = string.Join(", ", conflictingHolds.Distinct());
+                    return Conflict(new { message = $"Ghế [{heldStr}] hiện đang được người khác giữ chỗ. Vui lòng chọn ghế khác hoặc chờ hết thời gian giữ." });
+                }
+
+                // 5. Nếu client đã có HoldToken cũ, dọn dẹp các ghế cũ của session này
+                string holdToken = !string.IsNullOrWhiteSpace(request.HoldToken)
+                    ? request.HoldToken
+                    : Guid.NewGuid().ToString("N");
+
+                var previousHolds = await _context.SeatHolds
+                    .Where(h => h.ShowtimeId == request.ShowtimeId && h.SessionId == holdToken)
+                    .ToListAsync();
+
+                if (previousHolds.Any())
+                {
+                    _context.SeatHolds.RemoveRange(previousHolds);
+                }
+
+                // 6. Xác định UserId (từ JWT claim hoặc từ DTO nếu tồn tại trong DB)
+                int? userId = null;
+                var userIdClaim = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (int.TryParse(userIdClaim, out int parsedUserId) && await _context.Users.AnyAsync(u => u.Id == parsedUserId))
+                {
+                    userId = parsedUserId;
+                }
+                else if (request.UserId.HasValue && await _context.Users.AnyAsync(u => u.Id == request.UserId.Value))
+                {
+                    userId = request.UserId.Value;
+                }
+
+                // 7. Tạo bản ghi SeatHolds mới (ExpiresAt = NOW + 5 phút = 300 giây)
+                var expiresAt = DateTime.Now.AddMinutes(5);
+                var newSeatHolds = targetSeats.Select(seat => new SeatHold
+                {
+                    ShowtimeId = request.ShowtimeId,
+                    SeatId = seat.Id,
+                    UserId = userId,
+                    SessionId = holdToken,
+                    HeldAt = DateTime.Now,
+                    ExpiresAt = expiresAt
+                }).ToList();
+
+                _context.SeatHolds.AddRange(newSeatHolds);
+                await _context.SaveChangesAsync();
+
+                // 8. Tính tổng tiền ghế tạm tính
+                decimal totalSeatPrice = targetSeats.Sum(s => showtime.BasePrice + s.SeatType.ExtraPrice);
+
+                return Ok(new HoldSeatsResponseDto
+                {
+                    HoldToken = holdToken,
+                    ExpiresAt = expiresAt,
+                    RemainingSeconds = 300,
+                    ShowtimeId = request.ShowtimeId,
+                    HeldSeatIds = targetSeats.Select(s => s.Id).ToList(),
+                    HeldSeatNames = targetSeats.Select(s => $"{s.RowCode}{s.SeatNumber}").ToList(),
+                    TotalSeatPrice = totalSeatPrice,
+                    Message = "Giữ ghế thành công trong 5 phút. Vui lòng hoàn tất thanh toán trước khi hết hạn."
+                });
             }
-
-            if (showtime.EndTime <= DateTime.Now)
+            finally
             {
-                return BadRequest(new { message = "Suất chiếu này đã kết thúc, không thể thực hiện giữ ghế." });
+                _holdLock.Release();
             }
-
-            // 2. Lấy thông tin các ghế từ CSDL và kiểm tra thuộc phòng chiếu
-            var targetSeats = await _context.Seats
-                .Include(s => s.SeatType)
-                .Where(s => request.SeatIds.Contains(s.Id) && s.RoomId == showtime.RoomId && s.IsActive)
-                .ToListAsync();
-
-            if (targetSeats.Count != request.SeatIds.Distinct().Count())
-            {
-                return BadRequest(new { message = "Một số ghế được chọn không tồn tại hoặc không thuộc phòng chiếu của suất chiếu này." });
-            }
-
-            // 3. Kiểm tra các ghế đã được bán chưa (Booking có trạng thái Confirmed, Completed hoặc Paid)
-            var soldSeats = await _context.BookingSeats
-                .Include(bs => bs.Seat)
-                .Where(bs => bs.Booking.ShowtimeId == request.ShowtimeId &&
-                             request.SeatIds.Contains(bs.SeatId) &&
-                             (bs.Booking.Status == "Confirmed" ||
-                              bs.Booking.Status == "Completed" ||
-                              bs.Booking.PaymentStatus == "Paid"))
-                .Select(bs => $"{bs.Seat.RowCode}{bs.Seat.SeatNumber}")
-                .ToListAsync();
-
-            if (soldSeats.Any())
-            {
-                var seatListStr = string.Join(", ", soldSeats);
-                return Conflict(new { message = $"Ghế [{seatListStr}] đã được bán thành công cho khách hàng khác. Vui lòng chọn ghế khác." });
-            }
-
-            // 4. Kiểm tra các ghế đang bị người khác giữ tạm (SeatHolds còn hạn)
-            var now = DateTime.Now;
-            var heldQuery = _context.SeatHolds
-                .Include(h => h.Seat)
-                .Where(h => h.ShowtimeId == request.ShowtimeId &&
-                            request.SeatIds.Contains(h.SeatId) &&
-                            h.ExpiresAt > now);
-
-            // Nếu client gửi kèm HoldToken trước đó, bỏ qua ghế thuộc chính session này (cho phép gia hạn/đổi ghế)
-            if (!string.IsNullOrEmpty(request.HoldToken))
-            {
-                heldQuery = heldQuery.Where(h => h.SessionId != request.HoldToken);
-            }
-
-            var conflictingHolds = await heldQuery
-                .Select(h => $"{h.Seat.RowCode}{h.Seat.SeatNumber}")
-                .ToListAsync();
-
-            if (conflictingHolds.Any())
-            {
-                var heldStr = string.Join(", ", conflictingHolds.Distinct());
-                return Conflict(new { message = $"Ghế [{heldStr}] hiện đang được người khác giữ chỗ. Vui lòng chọn ghế khác hoặc chờ hết thời gian giữ." });
-            }
-
-            // 5. Nếu client đã có HoldToken cũ, dọn dẹp các ghế cũ của session này
-            string holdToken = !string.IsNullOrWhiteSpace(request.HoldToken)
-                ? request.HoldToken
-                : Guid.NewGuid().ToString("N");
-
-            var previousHolds = await _context.SeatHolds
-                .Where(h => h.ShowtimeId == request.ShowtimeId && h.SessionId == holdToken)
-                .ToListAsync();
-
-            if (previousHolds.Any())
-            {
-                _context.SeatHolds.RemoveRange(previousHolds);
-            }
-
-            // 6. Xác định UserId (từ JWT claim hoặc từ DTO)
-            int? userId = null;
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (int.TryParse(userIdClaim, out int parsedUserId))
-            {
-                userId = parsedUserId;
-            }
-            else if (request.UserId.HasValue)
-            {
-                userId = request.UserId.Value;
-            }
-
-            // 7. Tạo bản ghi SeatHolds mới (ExpiresAt = NOW + 5 phút = 300 giây)
-            var expiresAt = DateTime.Now.AddMinutes(5);
-            var newSeatHolds = targetSeats.Select(seat => new SeatHold
-            {
-                ShowtimeId = request.ShowtimeId,
-                SeatId = seat.Id,
-                UserId = userId,
-                SessionId = holdToken,
-                HeldAt = DateTime.Now,
-                ExpiresAt = expiresAt
-            }).ToList();
-
-            _context.SeatHolds.AddRange(newSeatHolds);
-            await _context.SaveChangesAsync();
-
-            // 8. Tính tổng tiền ghế tạm tính
-            decimal totalSeatPrice = targetSeats.Sum(s => showtime.BasePrice + s.SeatType.ExtraPrice);
-
-            return Ok(new HoldSeatsResponseDto
-            {
-                HoldToken = holdToken,
-                ExpiresAt = expiresAt,
-                RemainingSeconds = 300,
-                ShowtimeId = request.ShowtimeId,
-                HeldSeatIds = targetSeats.Select(s => s.Id).ToList(),
-                HeldSeatNames = targetSeats.Select(s => $"{s.RowCode}{s.SeatNumber}").ToList(),
-                TotalSeatPrice = totalSeatPrice,
-                Message = "Giữ ghế thành công trong 5 phút. Vui lòng hoàn tất thanh toán trước khi hết hạn."
-            });
         }
 
         /// <summary>
@@ -246,14 +257,14 @@ namespace CinemaSystemAPI.Controllers
 
             decimal totalAmount = totalSeatPrice + totalComboPrice;
 
-            // 5. Xác định UserId (nếu có đăng nhập)
+            // 5. Xác định UserId (nếu có đăng nhập và tồn tại trong DB)
             int? userId = null;
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (int.TryParse(userIdClaim, out int parsedUserId))
+            var userIdClaim = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (int.TryParse(userIdClaim, out int parsedUserId) && await _context.Users.AnyAsync(u => u.Id == parsedUserId))
             {
                 userId = parsedUserId;
             }
-            else if (request.UserId.HasValue)
+            else if (request.UserId.HasValue && await _context.Users.AnyAsync(u => u.Id == request.UserId.Value))
             {
                 userId = request.UserId.Value;
             }
@@ -514,6 +525,90 @@ namespace CinemaSystemAPI.Controllers
             };
 
             return Ok(response);
+        }
+
+        /// <summary>
+        /// Task 32: API Hủy vé & Hoàn ghế (Cancel Booking & Refund).
+        /// PUT /api/bookings/{id}/cancel
+        /// Hủy đơn vé -> hoàn tiền -> Cập nhật trạng thái Booking = Cancelled, PaymentStatus = Refunded.
+        /// Giải phóng ghế cho khách khác đặt.
+        /// </summary>
+        /// <param name="id">ID của đơn đặt vé cần hủy</param>
+        /// <param name="request">Lý do hủy vé (tùy chọn)</param>
+        [HttpPut("{id:int}/cancel")]
+        public async Task<ActionResult<CancelBookingResponseDto>> CancelBooking(int id, [FromBody] CancelBookingRequestDto? request = null)
+        {
+            var booking = await _context.Bookings
+                .Include(b => b.Showtime)
+                    .ThenInclude(s => s.Movie)
+                .Include(b => b.BookingSeats)
+                    .ThenInclude(bs => bs.Seat)
+                .Include(b => b.Payments)
+                .FirstOrDefaultAsync(b => b.Id == id);
+
+            if (booking == null)
+            {
+                return NotFound(new { message = $"Không tìm thấy đơn đặt vé #{id}." });
+            }
+
+            if (booking.Status == "Cancelled")
+            {
+                return BadRequest(new { message = $"Đơn đặt vé #{id} đã bị hủy trước đó." });
+            }
+
+            // Kiểm tra suất chiếu: Không cho phép hủy nếu suất chiếu đã bắt đầu hoặc đã kết thúc
+            if (booking.Showtime.StartTime <= DateTime.Now)
+            {
+                return BadRequest(new { message = "Không thể hủy vé vì suất chiếu đã bắt đầu hoặc đã kết thúc." });
+            }
+
+            // Bắt đầu Database Transaction đảm bảo tính toàn vẹn
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                // 1. Cập nhật trạng thái Booking
+                booking.Status = "Cancelled";
+                booking.PaymentStatus = "Refunded";
+                booking.UpdatedAt = DateTime.Now;
+
+                // 2. Cập nhật trạng thái các giao dịch thanh toán
+                foreach (var payment in booking.Payments)
+                {
+                    payment.Status = "Refunded";
+                }
+
+                // 3. Danh sách ghế được giải phóng
+                var freedSeatNames = booking.BookingSeats
+                    .Select(bs => $"{bs.Seat.RowCode}{bs.Seat.SeatNumber}")
+                    .ToList();
+
+                // 4. Lưu thay đổi
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                _logger.LogInformation("Đã hủy đơn vé #{BookingId}, hoàn trả {Amount:N0} đ, giải phóng ghế: [{Seats}]. Lý do: {Reason}",
+                    booking.Id, booking.TotalAmount, string.Join(", ", freedSeatNames), request?.Reason ?? "Khách yêu cầu hủy");
+
+                return Ok(new CancelBookingResponseDto
+                {
+                    BookingId = booking.Id,
+                    Status = booking.Status,
+                    PaymentStatus = booking.PaymentStatus,
+                    RefundAmount = booking.TotalAmount,
+                    CancelledAt = DateTime.Now,
+                    FreedSeatNames = freedSeatNames,
+                    Message = $"Hủy vé thành công! Đã hoàn trả {booking.TotalAmount:N0} đ và giải phóng các ghế [{string.Join(", ", freedSeatNames)}] để khách khác có thể đặt."
+                });
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                _logger.LogError(ex, "Lỗi xảy ra khi hủy đơn vé #{BookingId}", id);
+                return StatusCode(StatusCodes.Status500InternalServerError, new
+                {
+                    message = "Đã xảy ra sự cố trong quá trình hủy vé. Giao dịch đã được hoàn tác an toàn."
+                });
+            }
         }
     }
 }
