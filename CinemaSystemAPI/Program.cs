@@ -83,6 +83,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddSingleton<JwtService>();
 builder.Services.AddScoped<IAccountRepository, AccountRepository>();
 builder.Services.AddScoped<IMovieRepository, MovieRepository>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 
 // 6. Background Services (Task của Bách: tự động dọn dẹp giữ ghế hết hạn)
 builder.Services.AddHostedService<ExpiredSeatHoldCleanupService>();
