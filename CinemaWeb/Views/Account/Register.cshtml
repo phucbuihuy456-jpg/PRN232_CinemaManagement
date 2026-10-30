@@ -1,0 +1,110 @@
+@model CinemaWeb.Models.RegisterViewModel
+@{
+    ViewData["Title"] = "Đăng Ký Tài Khoản";
+}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-7 col-lg-6">
+            <div class="card bg-black border border-secondary shadow-lg rounded-4 p-4 p-md-5">
+                <div class="text-center mb-4">
+                    <a asp-controller="Home" asp-action="Index" class="text-decoration-none">
+                        <h2 class="text-danger fw-bold"><i class="bi bi-film me-2"></i>CINEMA</h2>
+                    </a>
+                    <h4 class="text-light fw-bold mt-2">Tạo Tài Khoản Mới</h4>
+                    <p class="text-secondary small">Trở thành thành viên để nhận ngay ưu đãi vé và tích điểm.</p>
+                </div>
+
+                @if (!ViewData.ModelState.IsValid && ViewData.ModelState[string.Empty] != null)
+                {
+                    <div class="alert alert-danger d-flex align-items-center small py-2 mb-3" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <div>
+                            @Html.ValidationSummary(true, "", new { @class = "text-danger m-0 list-unstyled" })
+                        </div>
+                    </div>
+                }
+
+                <form asp-controller="Account" asp-action="Register" method="post" novalidate>
+                    <!-- Full Name -->
+                    <div class="mb-3">
+                        <label asp-for="FullName" class="form-label text-light small fw-semibold">Họ và tên</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-dark border-secondary text-secondary">
+                                <i class="bi bi-person"></i>
+                            </span>
+                            <input asp-for="FullName" class="form-control bg-dark text-light border-secondary" placeholder="Nguyễn Văn A" />
+                        </div>
+                        <span asp-validation-for="FullName" class="text-danger small mt-1 d-block"></span>
+                    </div>
+
+                    <!-- Email -->
+                    <div class="mb-3">
+                        <label asp-for="Email" class="form-label text-light small fw-semibold">Địa chỉ Email</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-dark border-secondary text-secondary">
+                                <i class="bi bi-envelope"></i>
+                            </span>
+                            <input asp-for="Email" class="form-control bg-dark text-light border-secondary" placeholder="name@example.com" />
+                        </div>
+                        <span asp-validation-for="Email" class="text-danger small mt-1 d-block"></span>
+                    </div>
+
+                    <!-- Phone Number -->
+                    <div class="mb-3">
+                        <label asp-for="PhoneNumber" class="form-label text-light small fw-semibold">Số điện thoại</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-dark border-secondary text-secondary">
+                                <i class="bi bi-telephone"></i>
+                            </span>
+                            <input asp-for="PhoneNumber" class="form-control bg-dark text-light border-secondary" placeholder="0901234567" />
+                        </div>
+                        <span asp-validation-for="PhoneNumber" class="text-danger small mt-1 d-block"></span>
+                    </div>
+
+                    <!-- Password -->
+                    <div class="row g-2 mb-4">
+                        <div class="col-md-6">
+                            <label asp-for="Password" class="form-label text-light small fw-semibold">Mật khẩu</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-dark border-secondary text-secondary">
+                                <i class="bi bi-lock"></i>
+                                </span>
+                                <input asp-for="Password" class="form-control bg-dark text-light border-secondary" placeholder="••••••••" />
+                            </div>
+                            <span asp-validation-for="Password" class="text-danger small mt-1 d-block"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="ConfirmPassword" class="form-label text-light small fw-semibold">Xác nhận mật khẩu</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-dark border-secondary text-secondary">
+                                <i class="bi bi-shield-check"></i>
+                                </span>
+                                <input asp-for="ConfirmPassword" class="form-control bg-dark text-light border-secondary" placeholder="••••••••" />
+                            </div>
+                            <span asp-validation-for="ConfirmPassword" class="text-danger small mt-1 d-block"></span>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" class="btn btn-danger w-100 py-2 fw-bold rounded-pill shadow">
+                        <i class="bi bi-person-plus me-2"></i>Đăng Ký Tài Khoản
+                    </button>
+                </form>
+
+                <div class="text-center mt-4 pt-2 border-top border-secondary">
+                    <p class="text-secondary small mb-0">
+                        Đã có tài khoản? 
+                        <a asp-controller="Account" asp-action="Login" class="text-danger fw-semibold text-decoration-none">
+                            Đăng nhập
+                        </a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

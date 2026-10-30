@@ -1,0 +1,262 @@
+@model CinemaWeb.Models.HomeIndexViewModel
+@{
+    ViewData["Title"] = "Trang Chủ - Xem Lịch Chiếu & Đặt Vé";
+}
+
+<!-- 1. HERO BANNER SLIDER PHIM NỔI BẬT -->
+@if (Model.BannerMovies.Any())
+{
+    <section class="hero-section mb-5 position-relative">
+        <div id="heroMovieCarousel" class="carousel slide carousel-fade" data-bs-ride="carousel" data-bs-interval="5000">
+            <div class="carousel-indicators">
+                @for (int i = 0; i < Model.BannerMovies.Count; i++)
+                {
+                    <button type="button" data-bs-target="#heroMovieCarousel" data-bs-slide-to="@i" class="@(i == 0 ? "active" : "")" aria-current="@(i == 0 ? "true" : "false")"></button>
+                }
+            </div>
+            <div class="carousel-inner">
+                @for (int i = 0; i < Model.BannerMovies.Count; i++)
+                {
+                    var movie = Model.BannerMovies[i];
+                    var posterUrl = !string.IsNullOrEmpty(movie.PosterUrl) 
+                        ? movie.PosterUrl 
+                        : "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1200";
+
+                    <div class="carousel-item hero-slider-item @(i == 0 ? "active" : "")" style="background-image: url('@posterUrl');">
+                        <div class="hero-overlay d-flex align-items-center">
+                            <div class="container">
+                                <div class="row align-items-center">
+                                    <div class="col-lg-7 col-md-9 text-start">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            @if (!string.IsNullOrEmpty(movie.AgeRating))
+                                            {
+                                                <span class="badge @(movie.AgeRating == "C18" ? "bg-danger" : movie.AgeRating == "C16" ? "bg-warning text-dark" : "bg-success") px-2 py-1">
+                                                    @movie.AgeRating
+                                                </span>
+                                            }
+                                            <span class="badge bg-secondary"><i class="bi bi-clock me-1"></i>@movie.DurationMinutes phút</span>
+                                            <span class="text-warning small"><i class="bi bi-star-fill me-1"></i>Phim Hot</span>
+                                        </div>
+
+                                        <h1 class="display-4 fw-extrabold text-white mb-3 text-uppercase">@movie.Title</h1>
+
+                                        @if (movie.MovieGenres.Any())
+                                        {
+                                            <p class="text-danger fw-semibold mb-2">
+                                                <i class="bi bi-tag-fill me-1"></i>
+                                                @string.Join(", ", movie.MovieGenres.Where(g => g.Genre != null).Select(g => g.Genre!.Name))
+                                            </p>
+                                        }
+
+                                        <p class="lead text-light opacity-75 mb-4 line-clamp-3" style="max-height: 80px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;">
+                                            @movie.Description
+                                        </p>
+
+                                        <div class="d-flex flex-wrap gap-3">
+                                            <a asp-controller="Booking" asp-action="SeatMap" asp-route-id="1" class="btn btn-danger btn-lg px-4 fw-bold shadow-lg">
+                                                <i class="bi bi-ticket-perforated-fill me-2"></i> Đặt Vé Ngay
+                                            </a>
+                                            @if (!string.IsNullOrEmpty(movie.TrailerUrl))
+                                            {
+                                                <a href="@movie.TrailerUrl" target="_blank" class="btn btn-outline-light btn-lg px-4">
+                                                    <i class="bi bi-play-circle me-2"></i> Xem Trailer
+                                                </a>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+            <button class="carousel-control-prev" type="button" data-bs-target="#heroMovieCarousel" data-bs-slide="prev">
+                <span class="carousel-control-prev-icon"></span>
+            </button>
+            <button class="carousel-control-next" type="button" data-bs-target="#heroMovieCarousel" data-bs-slide="next">
+                <span class="carousel-control-next-icon"></span>
+            </button>
+        </div>
+    </section>
+}
+
+<div class="container py-4" id="movies-section">
+    <!-- 2. BỘ LỌC THEO THỂ LOẠI (GỌI ODATA) -->
+    <div class="d-flex flex-column align-items-center mb-5">
+        <h5 class="text-secondary text-uppercase fw-bold letter-spacing-1 mb-3">
+            <i class="bi bi-funnel-fill text-danger me-1"></i> Khám Phá Theo Thể Loại
+        </h5>
+        <div class="d-flex flex-wrap justify-content-center gap-2" id="genreFilterContainer">
+            <a asp-controller="Home" asp-action="Index" 
+               class="btn genre-filter-btn @(!Model.SelectedGenreId.HasValue || Model.SelectedGenreId.Value == 0 ? "active" : "")"
+               data-genre-id="0">
+                Tất Cả
+            </a>
+            @foreach (var genre in Model.Genres)
+            {
+                <a asp-controller="Home" asp-action="Index" asp-route-genreId="@genre.Id" 
+                   class="btn genre-filter-btn @(Model.SelectedGenreId == genre.Id ? "active" : "")"
+                   data-genre-id="@genre.Id">
+                    @genre.Name
+                </a>
+            }
+        </div>
+    </div>
+
+    <!-- 3. TABS: PHIM ĐANG CHIẾU / PHIM SẮP CHIẾU -->
+    <div class="d-flex justify-content-center mb-4">
+        <ul class="nav cinema-tabs gap-3" id="movieTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="now-showing-tab" data-bs-toggle="tab" data-bs-target="#now-showing" type="button" role="tab">
+                    <i class="bi bi-play-circle-fill text-danger me-2"></i>Phim Đang Chiếu (@Model.NowShowingMovies.Count)
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="coming-soon-tab" data-bs-toggle="tab" data-bs-target="#coming-soon" type="button" role="tab">
+                    <i class="bi bi-calendar2-week-fill text-warning me-2"></i>Phim Sắp Chiếu (@Model.ComingSoonMovies.Count)
+                </button>
+            </li>
+        </ul>
+    </div>
+
+    <!-- NỘI DUNG DANH SÁCH PHIM -->
+    <div class="tab-content" id="movieTabContent">
+        <!-- Tab 1: Phim đang chiếu -->
+        <div class="tab-pane fade show active" id="now-showing" role="tabpanel">
+            @if (Model.NowShowingMovies.Any())
+            {
+                <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4" id="nowShowingGrid">
+                    @foreach (var movie in Model.NowShowingMovies)
+                    {
+                        <div class="col">
+                            <div class="movie-card shadow-sm">
+                                <div class="movie-poster-wrapper">
+                                    @if (!string.IsNullOrEmpty(movie.AgeRating))
+                                    {
+                                        var badgeClass = movie.AgeRating switch
+                                        {
+                                            "P" => "badge-age-p",
+                                            "C13" => "badge-age-c13",
+                                            "C16" => "badge-age-c16",
+                                            "C18" => "badge-age-c18",
+                                            _ => "bg-secondary"
+                                        };
+                                        <span class="movie-age-badge @badgeClass">@movie.AgeRating</span>
+                                    }
+                                    <img src="@(string.IsNullOrEmpty(movie.PosterUrl) ? "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500" : movie.PosterUrl)" 
+                                         alt="@movie.Title" 
+                                         class="movie-poster-img"
+                                         loading="lazy" />
+                                </div>
+                                <div class="p-3 d-flex flex-column flex-grow-1">
+                                    <h6 class="fw-bold text-white mb-1 text-truncate" title="@movie.Title">@movie.Title</h6>
+                                    
+                                    <div class="small text-muted mb-2 d-flex justify-content-between align-items-center">
+                                        <span><i class="bi bi-clock me-1"></i>@movie.DurationMinutes'</span>
+                                        <span class="text-truncate" style="max-width: 140px;" title="@string.Join(", ", movie.MovieGenres.Where(g => g.Genre != null).Select(g => g.Genre!.Name))">
+                                            @string.Join(", ", movie.MovieGenres.Where(g => g.Genre != null).Select(g => g.Genre!.Name))
+                                        </span>
+                                    </div>
+
+                                    <div class="mt-auto pt-2">
+                                        <a asp-controller="Booking" asp-action="SeatMap" asp-route-id="1" class="btn btn-danger w-100 fw-semibold btn-sm py-2">
+                                            <i class="bi bi-ticket-perforated me-1"></i> Đặt Vé
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-film fs-1 d-block mb-3"></i>
+                    <p>Không có phim nào đang chiếu phù hợp với bộ lọc hiện tại.</p>
+                </div>
+            }
+        </div>
+
+        <!-- Tab 2: Phim sắp chiếu -->
+        <div class="tab-pane fade" id="coming-soon" role="tabpanel">
+            @if (Model.ComingSoonMovies.Any())
+            {
+                <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4" id="comingSoonGrid">
+                    @foreach (var movie in Model.ComingSoonMovies)
+                    {
+                        <div class="col">
+                            <div class="movie-card shadow-sm">
+                                <div class="movie-poster-wrapper">
+                                    @if (!string.IsNullOrEmpty(movie.AgeRating))
+                                    {
+                                        var badgeClass = movie.AgeRating switch
+                                        {
+                                            "P" => "badge-age-p",
+                                            "C13" => "badge-age-c13",
+                                            "C16" => "badge-age-c16",
+                                            "C18" => "badge-age-c18",
+                                            _ => "bg-secondary"
+                                        };
+                                        <span class="movie-age-badge @badgeClass">@movie.AgeRating</span>
+                                    }
+                                    <img src="@(string.IsNullOrEmpty(movie.PosterUrl) ? "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500" : movie.PosterUrl)" 
+                                         alt="@movie.Title" 
+                                         class="movie-poster-img"
+                                         loading="lazy" />
+                                </div>
+                                <div class="p-3 d-flex flex-column flex-grow-1">
+                                    <h6 class="fw-bold text-white mb-1 text-truncate" title="@movie.Title">@movie.Title</h6>
+                                    
+                                    <div class="small text-muted mb-2 d-flex justify-content-between align-items-center">
+                                        <span><i class="bi bi-clock me-1"></i>@movie.DurationMinutes'</span>
+                                        <span class="text-info fw-semibold">
+                                            <i class="bi bi-calendar-event me-1"></i>@movie.ReleaseDate.ToString("dd/MM/yyyy")
+                                        </span>
+                                    </div>
+
+                                    <div class="mt-auto pt-2">
+                                        @if (!string.IsNullOrEmpty(movie.TrailerUrl))
+                                        {
+                                            <a href="@movie.TrailerUrl" target="_blank" class="btn btn-outline-light w-100 fw-semibold btn-sm py-2">
+                                                <i class="bi bi-play-circle me-1"></i> Trailer
+                                            </a>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn btn-secondary w-100 fw-semibold btn-sm py-2" disabled>
+                                                Sắp Ra Mắt
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-calendar-x fs-1 d-block mb-3"></i>
+                    <p>Không có phim sắp chiếu nào phù hợp với bộ lọc hiện tại.</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Smooth scroll khi bấm Phim Chiếu
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    e.preventDefault();
+                    target.scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+    </script>
+}
