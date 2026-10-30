@@ -1,4 +1,5 @@
 using CinemaSystemAPI.Data;
+using CinemaSystemAPI.Middlewares;
 using CinemaSystemAPI.Models;
 using CinemaSystemAPI.Services;
 using CinemaSystemAPI.Services.Account;
@@ -8,10 +9,26 @@ using Microsoft.AspNetCore.OData;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Serilog;
 using System.Text;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// 0. Cấu hình Serilog Structured Logging
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .WriteTo.File(
+        path: "Logs/cinema-api-.log",
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 14,
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}"
+    )
+    .CreateLogger();
+
+builder.Host.UseSerilog();
 
 // 1. Add Controllers & OData
 builder.Services.AddControllers()
@@ -89,6 +106,12 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddHostedService<ExpiredSeatHoldCleanupService>();
 
 var app = builder.Build();
+
+// Ghi log request HTTP với Serilog
+app.UseSerilogRequestLogging();
+
+// Kích hoạt Global Exception Middleware theo chuẩn RFC 7807 ProblemDetails
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 // 7. Seed dữ liệu mẫu khi khởi động ứng dụng
 DbInitializer.Initialize(app.Services);

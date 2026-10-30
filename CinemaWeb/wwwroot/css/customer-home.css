@@ -1,0 +1,151 @@
+/* Cinema Customer Website Custom Styles */
+:root {
+    --cinema-primary: #e50914;
+    --cinema-dark: #141414;
+    --cinema-card-bg: #1f1f1f;
+    --cinema-border: #333333;
+}
+
+body {
+    background-color: var(--cinema-dark);
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    color: #e5e5e5;
+}
+
+/* Navbar */
+.cinema-navbar {
+    background: rgba(18, 18, 18, 0.95);
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.cinema-navbar .nav-link {
+    font-weight: 500;
+    color: #cfcfcf !important;
+    transition: color 0.2s;
+}
+
+.cinema-navbar .nav-link:hover,
+.cinema-navbar .nav-link.active {
+    color: var(--cinema-primary) !important;
+}
+
+/* Hero Carousel */
+.hero-slider-item {
+    height: 520px;
+    background-size: cover;
+    background-position: center;
+    position: relative;
+}
+
+.hero-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.65) 50%, rgba(0, 0, 0, 0.3) 100%),
+                linear-gradient(180deg, transparent 60%, rgba(20, 20, 20, 1) 100%);
+}
+
+.carousel-indicators [data-bs-target] {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin: 0 5px;
+}
+
+/* Movie Card */
+.movie-card {
+    background: var(--cinema-card-bg);
+    border: 1px solid var(--cinema-border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: transform 0.28s ease, box-shadow 0.28s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.movie-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 14px 28px rgba(229, 9, 20, 0.25);
+    border-color: rgba(229, 9, 20, 0.5);
+}
+
+.movie-poster-wrapper {
+    position: relative;
+    padding-top: 145%;
+    overflow: hidden;
+    background: #0d0d0d;
+}
+
+.movie-poster-img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.4s ease;
+}
+
+.movie-card:hover .movie-poster-img {
+    transform: scale(1.05);
+}
+
+.movie-age-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    font-weight: 700;
+    font-size: 0.8rem;
+    padding: 4px 8px;
+    border-radius: 6px;
+    z-index: 2;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+}
+
+.badge-age-p { background-color: #28a745; color: white; }
+.badge-age-c13 { background-color: #ffc107; color: black; }
+.badge-age-c16 { background-color: #fd7e14; color: white; }
+.badge-age-c18 { background-color: #dc3545; color: white; }
+
+/* Genre Filter Pills */
+.genre-filter-btn {
+    border-radius: 30px;
+    padding: 6px 18px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #bbb;
+    background: #252525;
+    border: 1px solid #3d3d3d;
+    transition: all 0.2s ease;
+}
+
+.genre-filter-btn:hover {
+    color: #fff;
+    background: #333;
+    border-color: #666;
+}
+
+.genre-filter-btn.active {
+    background-color: var(--cinema-primary);
+    border-color: var(--cinema-primary);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(229, 9, 20, 0.4);
+}
+
+/* Tabs */
+.cinema-tabs .nav-link {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #888;
+    border: none;
+    border-bottom: 3px solid transparent;
+    padding: 10px 24px;
+    background: transparent;
+}
+
+.cinema-tabs .nav-link.active {
+    color: #fff;
+    border-bottom: 3px solid var(--cinema-primary);
+    background: transparent;
+}

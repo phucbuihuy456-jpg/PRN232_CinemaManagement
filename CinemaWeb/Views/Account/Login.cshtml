@@ -1,0 +1,95 @@
+@model CinemaWeb.Models.LoginViewModel
+@{
+    ViewData["Title"] = "Đăng Nhập Tài Khoản";
+}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card bg-black border border-secondary shadow-lg rounded-4 p-4 p-md-5">
+                <div class="text-center mb-4">
+                    <a asp-controller="Home" asp-action="Index" class="text-decoration-none">
+                        <h2 class="text-danger fw-bold"><i class="bi bi-film me-2"></i>CINEMA</h2>
+                    </a>
+                    <h4 class="text-light fw-bold mt-2">Đăng Nhập</h4>
+                    <p class="text-secondary small">Chào mừng bạn quay trở lại! Vui lòng đăng nhập để tiếp tục.</p>
+                </div>
+
+                @if (TempData["SuccessMessage"] != null)
+                {
+                    <div class="alert alert-success d-flex align-items-center small py-2 mb-3" role="alert">
+                        <i class="bi bi-check-circle-fill me-2"></i>
+                        <div>@TempData["SuccessMessage"]</div>
+                    </div>
+                }
+
+                @if (!ViewData.ModelState.IsValid && ViewData.ModelState[string.Empty] != null)
+                {
+                    <div class="alert alert-danger d-flex align-items-center small py-2 mb-3" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <div>
+                            @Html.ValidationSummary(true, "", new { @class = "text-danger m-0 list-unstyled" })
+                        </div>
+                    </div>
+                }
+
+                <form asp-controller="Account" asp-action="Login" method="post" novalidate>
+                    <input type="hidden" asp-for="ReturnUrl" />
+
+                    <!-- Email Input -->
+                    <div class="mb-3">
+                        <label asp-for="Email" class="form-label text-light small fw-semibold">Email</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-dark border-secondary text-secondary">
+                                <i class="bi bi-envelope"></i>
+                            </span>
+                            <input asp-for="Email" class="form-control bg-dark text-light border-secondary" placeholder="name@example.com" />
+                        </div>
+                        <span asp-validation-for="Email" class="text-danger small mt-1 d-block"></span>
+                    </div>
+
+                    <!-- Password Input -->
+                    <div class="mb-3">
+                        <label asp-for="Password" class="form-label text-light small fw-semibold">Mật khẩu</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-dark border-secondary text-secondary">
+                                <i class="bi bi-lock"></i>
+                            </span>
+                            <input asp-for="Password" class="form-control bg-dark text-light border-secondary" placeholder="••••••••" />
+                        </div>
+                        <span asp-validation-for="Password" class="text-danger small mt-1 d-block"></span>
+                    </div>
+
+                    <!-- Remember Me -->
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <div class="form-check">
+                            <input asp-for="RememberMe" class="form-check-input bg-dark border-secondary" type="checkbox" id="rememberMeCheck" />
+                            <label class="form-check-label text-secondary small" for="rememberMeCheck">
+                                Ghi nhớ đăng nhập
+                            </label>
+                        </div>
+                        <a href="#" class="text-danger text-decoration-none small">Quên mật khẩu?</a>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" class="btn btn-danger w-100 py-2 fw-bold rounded-pill shadow">
+                        <i class="bi bi-box-arrow-in-right me-2"></i>Đăng Nhập
+                    </button>
+                </form>
+
+                <div class="text-center mt-4 pt-2 border-top border-secondary">
+                    <p class="text-secondary small mb-0">
+                        Chưa có tài khoản? 
+                        <a asp-controller="Account" asp-action="Register" class="text-danger fw-semibold text-decoration-none">
+                            Đăng ký ngay
+                        </a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
