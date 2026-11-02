@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Cinema Admin Console</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Bootstrap 5 CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <!-- Admin Layout Custom CSS -->
+    <link rel="stylesheet" href="~/css/admin-layout.css" asp-append-version="true" />
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body class="admin-body">
+    <!-- 1. SIDEBAR NAVIGATION -->
+    <aside class="admin-sidebar" id="adminSidebar">
+        <!-- Logo / Brand -->
+        <div class="admin-sidebar-brand justify-content-between">
+            <a asp-controller="Admin" asp-action="Index" class="text-decoration-none d-flex align-items-center">
+                <i class="bi bi-shield-lock-fill text-danger fs-3 me-2"></i>
+                <div>
+                    <div class="fw-bold fs-5 text-white lh-1">CINEMA</div>
+                    <small class="text-secondary" style="font-size: 0.7rem; letter-spacing: 0.05em;">ADMIN CONSOLE</small>
+                </div>
+            </a>
+            <button class="btn btn-sm btn-link text-secondary d-lg-none" type="button" id="sidebarCloseBtn">
+                <i class="bi bi-x-lg fs-5"></i>
+            </button>
+        </div>
+
+        <!-- Menu Navigation Items -->
+        <div class="admin-sidebar-menu">
+            <div class="admin-menu-header">Tổng Quan</div>
+            <a asp-controller="Admin" asp-action="Index" 
+               class="admin-nav-link @(ViewContext.RouteData.Values["controller"]?.ToString() == "Admin" && ViewContext.RouteData.Values["action"]?.ToString() == "Index" ? "active" : "")">
+                <i class="bi bi-speedometer2"></i>
+                <span>Bảng điều khiển</span>
+            </a>
+
+            <div class="admin-menu-header mt-3">Quản Lý Rạp Chiếu</div>
+            
+            @if (User.IsInRole("Admin"))
+            {
+                <!-- Quản lý Phim (Chỉ Admin) -->
+                <a asp-controller="Admin" asp-action="Movies" 
+                   class="admin-nav-link @(ViewContext.RouteData.Values["action"]?.ToString() == "Movies" ? "active" : "")">
+                    <i class="bi bi-film"></i>
+                    <span>Quản lý Phim</span>
+                </a>
+            }
+
+            <!-- Quản lý Suất chiếu (Admin & Staff) -->
+            <a asp-controller="Admin" asp-action="Showtimes" 
+               class="admin-nav-link @(ViewContext.RouteData.Values["action"]?.ToString() == "Showtimes" ? "active" : "")">
+                <i class="bi bi-calendar2-week"></i>
+                <span>Suất chiếu</span>
+            </a>
+
+            @if (User.IsInRole("Admin"))
+            {
+                <!-- Quản lý Combo bắp nước (Chỉ Admin) -->
+                <a asp-controller="Admin" asp-action="Combos" 
+                   class="admin-nav-link @(ViewContext.RouteData.Values["action"]?.ToString() == "Combos" ? "active" : "")">
+                    <i class="bi bi-cup-straw"></i>
+                    <span>Combo bắp nước</span>
+                </a>
+            }
+
+            @if (User.IsInRole("Admin"))
+            {
+                <div class="admin-menu-header mt-3">Hệ Thống</div>
+
+                <!-- Quản lý Thể loại -->
+                <a asp-controller="Admin" asp-action="Genres" 
+                   class="admin-nav-link @(ViewContext.RouteData.Values["action"]?.ToString() == "Genres" ? "active" : "")">
+                    <i class="bi bi-tags"></i>
+                    <span>Thể loại phim</span>
+                </a>
+
+                <!-- Quản lý Tài khoản người dùng -->
+                <a asp-controller="Admin" asp-action="Users" 
+                   class="admin-nav-link @(ViewContext.RouteData.Values["action"]?.ToString() == "Users" ? "active" : "")">
+                    <i class="bi bi-people"></i>
+                    <span>Người dùng & Quyền</span>
+                </a>
+            }
+
+            <div class="admin-menu-header mt-3">Cổng Bán Vé</div>
+            <a asp-controller="Booking" asp-action="SeatMap" class="admin-nav-link" target="_blank">
+                <i class="bi bi-grid-3x3-gap"></i>
+                <span>Sơ đồ ghế (POS)</span>
+                <i class="bi bi-box-arrow-up-right ms-auto" style="font-size: 0.8rem;"></i>
+            </a>
+        </div>
+
+        <!-- Sidebar Footer: Thông tin User đăng nhập -->
+        <div class="admin-sidebar-footer">
+            <div class="d-flex align-items-center">
+                <div class="avatar bg-danger text-white rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 38px; height: 38px;">
+                    <i class="bi bi-person-fill fs-5"></i>
+                </div>
+                <div class="overflow-hidden me-auto">
+                    <div class="fw-semibold text-white text-truncate" style="font-size: 0.88rem;">@User.Identity?.Name</div>
+                    <span class="badge @(User.IsInRole("Admin") ? "bg-danger" : "bg-warning text-dark")" style="font-size: 0.68rem;">
+                        @(User.IsInRole("Admin") ? "Quản Trị Viên" : "Nhân Viên")
+                    </span>
+                </div>
+                <a asp-controller="Account" asp-action="Logout" class="btn btn-sm btn-outline-secondary text-light p-1" title="Đăng xuất">
+                    <i class="bi bi-box-arrow-right fs-5"></i>
+                </a>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 2. MAIN WRAPPER (Header + Content) -->
+    <div class="admin-main-wrapper">
+        <!-- Top Navbar -->
+        <header class="admin-navbar justify-content-between">
+            <div class="d-flex align-items-center">
+                <button class="btn btn-link text-secondary d-lg-none me-3 p-0" id="sidebarToggleBtn" type="button">
+                    <i class="bi bi-list fs-3"></i>
+                </button>
+                <div class="d-none d-sm-block">
+                    <span class="text-secondary" style="font-size: 0.88rem;">Hệ thống rạp chiếu / </span>
+                    <span class="text-white fw-semibold" style="font-size: 0.88rem;">@ViewData["Title"]</span>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-3">
+                <!-- Nút xem trang Client ngoài -->
+                <a asp-controller="Home" asp-action="Index" target="_blank" class="btn btn-sm btn-outline-secondary d-flex align-items-center text-light">
+                    <i class="bi bi-globe me-1"></i>
+                    <span class="d-none d-md-inline">Xem trang khách hàng</span>
+                </a>
+
+                <!-- Swagger Documentation link -->
+                <a href="http://localhost:5027/swagger" target="_blank" class="btn btn-sm btn-outline-dark text-secondary d-none d-md-flex align-items-center border-secondary">
+                    <i class="bi bi-terminal me-1"></i> Swagger API
+                </a>
+
+                <!-- User Dropdown Menu -->
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-dark border border-secondary dropdown-toggle d-flex align-items-center py-1 px-2" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-person-circle fs-5 me-2 text-danger"></i>
+                        <span class="d-none d-md-inline me-1">@User.Identity?.Name</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end shadow">
+                        <li><h6 class="dropdown-header">Tài khoản: @User.Identity?.Name</h6></li>
+                        <li>
+                            <span class="dropdown-item-text text-secondary small">
+                                Quyền: <strong class="text-light">@(User.IsInRole("Admin") ? "Admin" : "Staff")</strong>
+                            </span>
+                        </li>
+                        <li><hr class="dropdown-divider border-secondary"></li>
+                        <li>
+                            <a class="dropdown-item text-danger" asp-controller="Account" asp-action="Logout">
+                                <i class="bi bi-box-arrow-right me-2"></i>Đăng xuất
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="admin-content">
+            @RenderBody()
+        </main>
+
+        <!-- Footer Admin -->
+        <footer class="py-3 px-4 border-top border-dark text-secondary small d-flex justify-content-between align-items-center bg-dark">
+            <div>&copy; @DateTime.Now.Year - Cinema Management System. All rights reserved.</div>
+            <div>Phiên bản 1.0 (PRN232)</div>
+        </footer>
+    </div>
+
+    <!-- Bootstrap 5 Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Toggle Sidebar on mobile/tablet
+        const sidebar = document.getElementById('adminSidebar');
+        const toggleBtn = document.getElementById('sidebarToggleBtn');
+        const closeBtn = document.getElementById('sidebarCloseBtn');
+
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', () => {
+                sidebar.classList.toggle('show');
+            });
+        }
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                sidebar.classList.remove('show');
+            });
+        }
+    </script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

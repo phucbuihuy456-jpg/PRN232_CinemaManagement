@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="utf-8" />
@@ -66,7 +66,11 @@
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end shadow">
                                     <li><h6 class="dropdown-header">Tài khoản: @User.Identity.Name</h6></li>
-                                    <li><a class="dropdown-item" href="#"><i class="bi bi-person me-2"></i>Thông tin cá nhân</a></li>
+                                    @if (User.IsInRole("Admin") || User.IsInRole("Staff"))
+{
+    <li><a class="dropdown-item text-warning fw-semibold" asp-controller="Admin" asp-action="Index"><i class="bi bi-speedometer2 me-2"></i>Trang Quản Trị</a></li>
+}
+<li><a class="dropdown-item" href="#"><i class="bi bi-person me-2"></i>Thông tin cá nhân</a></li>
                                     <li><a class="dropdown-item" href="#"><i class="bi bi-ticket-detailed me-2"></i>Vé đã đặt</a></li>
                                     <li><hr class="dropdown-divider border-secondary"></li>
                                     <li>
