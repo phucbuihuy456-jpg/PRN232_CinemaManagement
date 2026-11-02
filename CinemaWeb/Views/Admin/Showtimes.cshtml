@@ -1,0 +1,57 @@
+@{
+    ViewData["Title"] = "Quản lý Suất chiếu";
+    Layout = "_AdminLayout";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h3 class="fw-bold text-white mb-1"><i class="bi bi-calendar2-week text-primary me-2"></i>Quản Lý Suất Chiếu</h3>
+        <p class="text-secondary mb-0">Theo dõi và phân bổ lịch chiếu các phòng (Quyền: Admin & Staff)</p>
+    </div>
+</div>
+
+<div class="card admin-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-calendar-check me-2"></i>Danh Sách Suất Chiếu</span>
+        <span class="badge bg-primary">Admin & Staff đều có quyền</span>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="p-3 bg-dark border border-secondary rounded-3">
+                    <span class="badge bg-danger mb-2">Suất #1</span>
+                    <h5 class="text-white fw-bold">Mai</h5>
+                    <div class="text-secondary small mb-2"><i class="bi bi-geo-alt me-1"></i>Phòng Chiếu 01 (2D)</div>
+                    <div class="text-secondary small mb-3"><i class="bi bi-clock me-1"></i>14:00 - 16:30</div>
+                    <a asp-controller="Booking" asp-action="SeatMap" asp-route-showtimeId="1" target="_blank" class="btn btn-sm btn-outline-danger w-100">
+                        <i class="bi bi-grid-3x3-gap me-1"></i> Xem Sơ đồ ghế
+                    </a>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="p-3 bg-dark border border-secondary rounded-3">
+                    <span class="badge bg-primary mb-2">Suất #2</span>
+                    <h5 class="text-white fw-bold">Dune 2</h5>
+                    <div class="text-secondary small mb-2"><i class="bi bi-geo-alt me-1"></i>Phòng Chiếu 02 (IMAX)</div>
+                    <div class="text-secondary small mb-3"><i class="bi bi-clock me-1"></i>18:00 - 21:00</div>
+                    <a asp-controller="Booking" asp-action="SeatMap" asp-route-showtimeId="2" target="_blank" class="btn btn-sm btn-outline-primary w-100">
+                        <i class="bi bi-grid-3x3-gap me-1"></i> Xem Sơ đồ ghế
+                    </a>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="p-3 bg-dark border border-secondary rounded-3">
+                    <span class="badge bg-warning text-dark mb-2">Suất #3</span>
+                    <h5 class="text-white fw-bold">Kung Fu Panda 4</h5>
+                    <div class="text-secondary small mb-2"><i class="bi bi-geo-alt me-1"></i>Phòng Chiếu 01 (2D)</div>
+                    <div class="text-secondary small mb-3"><i class="bi bi-clock me-1"></i>09:30 - 11:30</div>
+                    <a asp-controller="Booking" asp-action="SeatMap" asp-route-showtimeId="3" target="_blank" class="btn btn-sm btn-outline-warning w-100">
+                        <i class="bi bi-grid-3x3-gap me-1"></i> Xem Sơ đồ ghế
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

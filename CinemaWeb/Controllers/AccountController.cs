@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using CinemaWeb.Models;
@@ -179,6 +179,11 @@ namespace CinemaWeb.Controllers
                     if (!string.IsNullOrEmpty(model.ReturnUrl) && Url.IsLocalUrl(model.ReturnUrl))
                     {
                         return Redirect(model.ReturnUrl);
+                    }
+
+                    if (role == "Admin" || role == "Staff")
+                    {
+                        return RedirectToAction("Index", "Admin");
                     }
 
                     return RedirectToAction("Index", "Home");

@@ -1,0 +1,51 @@
+@{
+    ViewData["Title"] = "Không có quyền truy cập";
+    Layout = "_Layout";
+}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-7 col-lg-6">
+            <div class="card bg-dark border border-secondary shadow-lg text-center p-4 p-md-5 rounded-4">
+                <div class="mb-4">
+                    <div class="d-inline-flex align-items-center justify-content-center bg-danger bg-opacity-10 text-danger rounded-circle p-4" style="width: 100px; height: 100px;">
+                        <i class="bi bi-shield-slash-fill" style="font-size: 3.5rem;"></i>
+                    </div>
+                </div>
+
+                <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-3 py-2 rounded-pill fw-semibold mb-3 align-self-center">
+                    HTTP 403 FORBIDDEN
+                </span>
+
+                <h2 class="fw-bold text-white mb-2">Truy Cập Bị Từ Chối!</h2>
+                <p class="text-secondary mb-4">
+                    Tài khoản của bạn 
+                    @if (User.Identity != null && User.Identity.IsAuthenticated)
+                    {
+                        <strong class="text-light">(@User.Identity.Name - @(User.IsInRole("Admin") ? "Admin" : User.IsInRole("Staff") ? "Staff" : "Customer"))</strong>
+                    }
+                    không có đủ quyền hạn để truy cập vào phân hệ quản trị hoặc chức năng này.
+                </p>
+
+                <div class="d-flex flex-column flex-sm-row justify-content-center gap-2">
+                    <a asp-controller="Home" asp-action="Index" class="btn btn-danger px-4 py-2 rounded-pill fw-semibold">
+                        <i class="bi bi-house-door me-1"></i> Về Trang Chủ
+                    </a>
+
+                    @if (User.Identity != null && User.Identity.IsAuthenticated)
+                    {
+                        <a asp-controller="Account" asp-action="Logout" class="btn btn-outline-secondary px-4 py-2 rounded-pill">
+                            <i class="bi bi-box-arrow-right me-1"></i> Đăng nhập tài khoản khác
+                        </a>
+                    }
+                    else
+                    {
+                        <a asp-controller="Account" asp-action="Login" class="btn btn-outline-danger px-4 py-2 rounded-pill">
+                            <i class="bi bi-person me-1"></i> Đăng nhập
+                        </a>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
