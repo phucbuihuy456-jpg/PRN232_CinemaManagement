@@ -15,7 +15,7 @@ body {
 /* Curved Screen Effect */
 .screen-container {
     perspective: 800px;
-    margin: 2rem auto 3rem auto;
+    margin: 1.5rem auto 2.5rem auto;
     max-width: 650px;
     text-align: center;
 }
@@ -46,13 +46,22 @@ body {
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
 }
 
-/* Seat Rows & Grid */
+/* Seat Rows & Grid (Task 34: Responsive Scrolling on Mobile) */
+.seat-grid-container {
+    overflow-x: auto;
+    padding: 10px 0;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #475569 #0f172a;
+}
+
 .seat-row {
     display: flex;
     align-items: center;
     justify-content: center;
     margin-bottom: 12px;
     gap: 8px;
+    min-width: fit-content;
 }
 
 .row-label {
@@ -63,7 +72,7 @@ body {
     text-align: center;
 }
 
-/* Base Seat */
+/* Base Seat (Task 34: Smooth Cubic-Bezier Animation) */
 .seat-btn {
     position: relative;
     border: none;
@@ -74,7 +83,7 @@ body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s ease-in-out;
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s, box-shadow 0.25s;
     cursor: pointer;
     user-select: none;
     height: 38px;
@@ -91,8 +100,8 @@ body {
 .seat-type-standard:hover:not(.seat-sold):not(.seat-held):not(.seat-disabled) {
     background-color: #475569;
     border-color: #94a3b8;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 10px rgba(148, 163, 184, 0.3);
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 4px 12px rgba(148, 163, 184, 0.35);
 }
 
 /* 2. Ghế VIP */
@@ -105,8 +114,8 @@ body {
 .seat-type-vip:hover:not(.seat-sold):not(.seat-held):not(.seat-disabled) {
     background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
     border-color: #fde68a;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 14px rgba(245, 158, 11, 0.45);
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 6px 14px rgba(245, 158, 11, 0.5);
 }
 
 /* 3. Ghế Couple (Đôi) - Rộng gấp đôi */
@@ -121,17 +130,23 @@ body {
 .seat-type-couple:hover:not(.seat-sold):not(.seat-held):not(.seat-disabled) {
     background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);
     border-color: #fbcfe8;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 14px rgba(236, 72, 153, 0.45);
+    transform: translateY(-3px) scale(1.03);
+    box-shadow: 0 6px 14px rgba(236, 72, 153, 0.5);
 }
 
 /* Phân biệt trạng thái ghế (Seat Status) */
-/* 1. Đang chọn (Selected) */
+/* 1. Đang chọn (Selected) - Animation nảy mượt mà */
+@keyframes seatPop {
+    0% { transform: scale(0.9); }
+    50% { transform: scale(1.18); }
+    100% { transform: scale(1.08) translateY(-2px); }
+}
+
 .seat-btn.seat-selected {
     background: #10b981 !important;
     border-color: #34d399 !important;
     color: #ffffff !important;
-    transform: scale(1.08) translateY(-2px);
+    animation: seatPop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
     box-shadow: 0 6px 16px rgba(16, 185, 129, 0.6) !important;
 }
 
@@ -143,65 +158,132 @@ body {
     cursor: not-allowed;
     opacity: 0.85;
 }
-.seat-held::after {
-    content: "⏳";
-    position: absolute;
-    top: -5px;
-    right: -5px;
-    font-size: 0.65rem;
-}
 
 /* 3. Đã bán (Sold) */
 .seat-btn.seat-sold {
     background-color: #1e293b !important;
-    border-color: #334155 !important;
+    border: 1px dashed #475569 !important;
     color: #64748b !important;
     cursor: not-allowed;
-    opacity: 0.5;
-    text-decoration: line-through;
+    opacity: 0.6;
 }
 
-/* 4. Khóa / Bảo trì (Disabled) */
+/* 4. Bảo trì / Khóa (Disabled) */
 .seat-btn.seat-disabled {
-    background-color: #18181b !important;
-    border-color: #ef4444 !important;
-    color: #ef4444 !important;
+    background-color: #0f172a !important;
+    border: 1px solid #1e293b !important;
+    color: #475569 !important;
     cursor: not-allowed;
     opacity: 0.4;
 }
 
-/* Legend (Bảng chú thích) */
+/* Chú thích màu sắc (Legend) */
 .legend-item {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 8px;
     font-size: 0.85rem;
-}
-.legend-sample {
-    width: 22px;
-    height: 22px;
-    border-radius: 5px;
-    display: inline-block;
-}
-.legend-sample.sample-couple {
-    width: 44px;
+    color: #cbd5e1;
 }
 
-/* Booking Summary Card */
+.legend-sample {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.legend-sample.sample-couple {
+    width: 36px;
+}
+
+/* Summary Bottom Bar */
 .summary-card {
-    background: #1e293b;
+    background: #0f172a;
     border: 1px solid #334155;
     border-radius: 12px;
 }
+
 .selected-seat-badge {
-    background: #0f172a;
+    background: rgba(16, 185, 129, 0.2);
     border: 1px solid #10b981;
     color: #34d399;
     padding: 4px 10px;
     border-radius: 20px;
-    font-size: 0.82rem;
+    font-size: 0.85rem;
     font-weight: 600;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
+}
+
+/* Task 34: Hiệu ứng cảnh báo đồng hồ đếm ngược sắp hết giờ (Pulse Animation) */
+@keyframes timerPulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.06); opacity: 0.85; box-shadow: 0 0 18px rgba(239, 68, 68, 0.8); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.timer-warning-pulse {
+    animation: timerPulse 0.8s infinite ease-in-out !important;
+    background-color: #dc2626 !important;
+    border: 2px solid #fca5a5 !important;
+    color: #ffffff !important;
+}
+
+/* Spinner quay chậm cho live badge */
+@keyframes spinSlow {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+.spin-slow {
+    display: inline-block;
+    animation: spinSlow 3s linear infinite;
+}
+
+/* Task 34: Tối ưu hiển thị Responsive trên Mobile & Tablet */
+@media (max-width: 768px) {
+    .seat-map-wrapper {
+        padding: 1.5rem 0.75rem;
+        border-radius: 12px;
+    }
+
+    .seat-row {
+        gap: 5px;
+        margin-bottom: 8px;
+    }
+
+    .seat-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 0.7rem;
+        border-radius: 6px 6px 3px 3px;
+    }
+
+    .seat-type-couple {
+        width: 68px !important;
+    }
+
+    .row-label {
+        width: 22px;
+        font-size: 0.85rem;
+    }
+
+    .screen-container {
+        margin: 1rem auto 2rem auto;
+    }
+}
+
+@media (max-width: 576px) {
+    .seat-btn {
+        width: 28px;
+        height: 28px;
+        font-size: 0.65rem;
+    }
+
+    .seat-type-couple {
+        width: 60px !important;
+    }
+
+    .row-label {
+        width: 18px;
+        font-size: 0.75rem;
+    }
 }

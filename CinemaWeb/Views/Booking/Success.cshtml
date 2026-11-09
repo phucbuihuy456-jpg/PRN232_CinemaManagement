@@ -1,0 +1,126 @@
+@model CinemaWeb.Models.BookingSuccessViewModel
+@{
+    ViewData["Title"] = "Đặt vé thành công - Đơn hàng #" + Model.BookingId;
+}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- Success Notification Card -->
+            <div class="card bg-dark border-success shadow-lg mb-4 text-center p-4">
+                <div class="mb-3">
+                    <span class="badge bg-success rounded-circle p-3 shadow">
+                        <i class="bi bi-check-lg fs-1 text-white"></i>
+                    </span>
+                </div>
+                <h2 class="fw-bold text-white mb-1">ĐẶT VÉ & THANH TOÁN THÀNH CÔNG!</h2>
+                <p class="text-secondary mb-3">
+                    Cảm ơn quý khách. Mã vé điện tử và thông tin chi tiết đã được xác nhận trên hệ thống.
+                </p>
+                <div class="d-inline-flex justify-content-center gap-3 flex-wrap">
+                    <span class="badge bg-black border border-secondary text-light px-3 py-2 fs-6">
+                        Mã đơn: <strong class="text-warning">#@Model.BookingId</strong>
+                    </span>
+                    <span class="badge bg-black border border-secondary text-light px-3 py-2 fs-6">
+                        Giao dịch: <strong class="text-info">@Model.TransactionId</strong>
+                    </span>
+                    <span class="badge bg-success bg-opacity-75 text-white px-3 py-2 fs-6">
+                        <i class="bi bi-patch-check-fill me-1"></i> @Model.PaymentStatus (@Model.PaymentMethod)
+                    </span>
+                </div>
+            </div>
+
+            <!-- Ticket & QR Code Card -->
+            <div class="card bg-dark border-secondary shadow-lg overflow-hidden mb-4">
+                <div class="card-header bg-black border-secondary py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold text-white mb-0">
+                        <i class="bi bi-qr-code text-danger me-2"></i>Vé xem phim điện tử (E-Ticket)
+                    </h5>
+                    <button type="button" class="btn btn-outline-light btn-sm" onclick="window.print()">
+                        <i class="bi bi-printer me-1"></i> In vé
+                    </button>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row align-items-center g-4">
+                        <!-- QR Code Area -->
+                        <div class="col-md-5 text-center border-end border-secondary border-opacity-50">
+                            <div class="p-3 bg-white d-inline-block rounded shadow mb-2">
+                                <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=@Model.QrCodeToken"
+                                     alt="QR Code Check-in"
+                                     class="img-fluid"
+                                     style="width: 180px; height: 180px;" />
+                            </div>
+                            <div class="text-secondary small font-monospace mt-1">
+                                Mã tra cứu: <span class="text-warning fw-bold">@Model.QrCodeToken</span>
+                            </div>
+                            <div class="text-secondary small fst-italic mt-1">
+                                Vui lòng xuất trình mã QR này tại quầy soát vé để vào phòng chiếu.
+                            </div>
+                        </div>
+
+                        <!-- Ticket Details Area -->
+                        <div class="col-md-7">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <span class="badge bg-danger">@Model.ScreenType</span>
+                                <span class="badge bg-secondary">@Model.Status</span>
+                            </div>
+                            <h4 class="fw-bold text-white mb-2">@Model.MovieTitle</h4>
+                            
+                            <div class="d-flex flex-column gap-2 text-secondary small mb-3">
+                                <div>
+                                    <i class="bi bi-door-open-fill text-warning me-2"></i>
+                                    Phòng chiếu: <strong class="text-light">@Model.RoomName</strong>
+                                </div>
+                                <div>
+                                    <i class="bi bi-calendar-event-fill text-warning me-2"></i>
+                                    Suất chiếu: <strong class="text-light">@Model.StartTime.ToString("dd/MM/yyyy") | @Model.StartTime.ToString("HH:mm") - @Model.EndTime.ToString("HH:mm")</strong>
+                                </div>
+                                <div>
+                                    <i class="bi bi-ticket-detailed-fill text-warning me-2"></i>
+                                    Ghế đã đặt:
+                                    @foreach (var s in Model.Seats)
+                                    {
+                                        <span class="badge bg-danger me-1 fs-6">@s.SeatName (@s.SeatTypeName)</span>
+                                    }
+                                </div>
+                                @if (Model.Combos.Any())
+                                {
+                                    <div>
+                                        <i class="bi bi-cup-straw text-warning me-2"></i>
+                                        Bắp nước:
+                                        @foreach (var c in Model.Combos)
+                                        {
+                                            <span class="badge bg-dark border border-secondary text-light me-1">@c.ComboName x@c.Quantity</span>
+                                        }
+                                    </div>
+                                }
+                                @if (!string.IsNullOrEmpty(Model.CustomerName))
+                                {
+                                    <div class="pt-2 border-top border-secondary border-opacity-50">
+                                        <i class="bi bi-person-fill text-info me-2"></i>
+                                        Người nhận: <span class="text-light fw-semibold">@Model.CustomerName</span> | @Model.CustomerPhone | @Model.CustomerEmail
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="p-3 rounded bg-black border border-secondary d-flex justify-content-between align-items-center">
+                                <span class="text-secondary small text-uppercase fw-bold">Tổng thanh toán:</span>
+                                <span class="text-warning fs-3 fw-bold">@Model.TotalAmount.ToString("N0") đ</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="d-flex justify-content-center gap-3">
+                <a asp-controller="Booking" asp-action="SeatMap" asp-route-id="1" class="btn btn-outline-secondary px-4 py-2">
+                    <i class="bi bi-arrow-repeat me-1"></i> Đặt vé suất khác
+                </a>
+                <a href="/" class="btn btn-danger px-4 py-2 fw-bold">
+                    <i class="bi bi-house-door-fill me-1"></i> Về trang chủ
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

@@ -38,7 +38,7 @@ namespace CinemaSystemAPI.Models
 
         // Optimistic concurrency
         [Timestamp]
-        public byte[] RowVersion { get; set; } = null!;
+        public byte[] RowVersion { get; set; } = new byte[8];
 
         public virtual User? User { get; set; }
         public virtual Showtime Showtime { get; set; } = null!;
