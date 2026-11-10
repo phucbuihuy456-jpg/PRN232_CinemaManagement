@@ -1,5 +1,5 @@
 @{
-    ViewData["Title"] = "Bảng điều khiển (Dashboard)";
+    ViewData["Title"] = "Bảng Điều Khiển (Admin Dashboard)";
     Layout = "_AdminLayout";
 }
 
@@ -10,87 +10,216 @@
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
                 <div>
                     <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-3 py-1 rounded-pill mb-2">
-                        <i class="bi bi-shield-check me-1"></i> Khu Vực Quản Trị Hệ Thống
+                        <i class="bi bi-speedometer2 me-1"></i> Bảng Điều Khiển Quản Trị Hệ Thống
                     </span>
                     <h2 class="fw-bold text-white mb-1">Xin chào, @User.Identity?.Name!</h2>
                     <p class="text-secondary mb-0">
                         Vai trò hiện tại: <span class="badge @(User.IsInRole("Admin") ? "bg-danger" : "bg-warning text-dark") fs-6">@(User.IsInRole("Admin") ? "Quản Trị Viên (Admin)" : "Nhân Viên (Staff)")</span>
-                        - Chúc bạn một ngày làm việc hiệu quả.
+                        - Thống kê tình hình kinh doanh thời gian thực.
                     </p>
                 </div>
-                <div class="d-flex gap-2">
-                    <a asp-controller="Booking" asp-action="SeatMap" target="_blank" class="btn btn-outline-danger d-flex align-items-center">
-                        <i class="bi bi-grid-3x3-gap me-2"></i> Mở Sơ đồ ghế (POS)
+                <div class="d-flex flex-wrap gap-2">
+                    <a asp-controller="Pos" asp-action="Scanner" class="btn btn-outline-info d-flex align-items-center">
+                        <i class="bi bi-qr-code-scan me-2"></i> Soát Vé QR
                     </a>
+                    <a asp-controller="Pos" asp-action="Index" target="_blank" class="btn btn-outline-warning d-flex align-items-center">
+                        <i class="bi bi-display me-2"></i> Bán Vé POS
+                    </a>
+                    <button id="btnRefreshStats" class="btn btn-outline-secondary d-flex align-items-center" title="Làm mới dữ liệu">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Làm mới
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Quick Statistics Cards -->
+<!-- 4 Real-time KPI Metric Cards -->
 <div class="row g-3 mb-4">
-    <!-- Phim đang chiếu -->
+    <!-- 1. Doanh thu hôm nay -->
     <div class="col-sm-6 col-xl-3">
         <div class="card admin-card p-3 h-100">
             <div class="d-flex align-items-center justify-content-between">
                 <div>
-                    <span class="text-secondary small text-uppercase fw-bold">Phim đang chiếu</span>
-                    <h3 class="fw-bold text-white mb-0 mt-1">3</h3>
-                    <small class="text-success"><i class="bi bi-arrow-up"></i> Sẵn sàng phục vụ</small>
+                    <span class="text-secondary small text-uppercase fw-bold">Doanh thu hôm nay</span>
+                    <h3 class="fw-bold text-white mb-0 mt-1" id="kpiTodayRevenue">-- đ</h3>
+                    <small id="kpiGrowthBadge" class="text-success">
+                        <i class="bi bi-arrow-up"></i> Đang tải...
+                    </small>
                 </div>
                 <div class="rounded-3 bg-danger bg-opacity-10 text-danger p-3 fs-3">
-                    <i class="bi bi-camera-reels"></i>
+                    <i class="bi bi-cash-stack"></i>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Suất chiếu hôm nay -->
+    <!-- 2. Vé bán hôm nay -->
+    <div class="col-sm-6 col-xl-3">
+        <div class="card admin-card p-3 h-100">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-secondary small text-uppercase fw-bold">Vé bán hôm nay</span>
+                    <h3 class="fw-bold text-white mb-0 mt-1" id="kpiTodayTickets">--</h3>
+                    <small class="text-secondary" id="kpiBookingsCount">0 đơn đặt vé</small>
+                </div>
+                <div class="rounded-3 bg-primary bg-opacity-10 text-primary p-3 fs-3">
+                    <i class="bi bi-ticket-perforated"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Suất chiếu hoạt động -->
     <div class="col-sm-6 col-xl-3">
         <div class="card admin-card p-3 h-100">
             <div class="d-flex align-items-center justify-content-between">
                 <div>
                     <span class="text-secondary small text-uppercase fw-bold">Suất chiếu hôm nay</span>
-                    <h3 class="fw-bold text-white mb-0 mt-1">3</h3>
-                    <small class="text-secondary">Phòng 01 & Phòng IMAX</small>
-                </div>
-                <div class="rounded-3 bg-primary bg-opacity-10 text-primary p-3 fs-3">
-                    <i class="bi bi-calendar-event"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Combo bắp nước -->
-    <div class="col-sm-6 col-xl-3">
-        <div class="card admin-card p-3 h-100">
-            <div class="d-flex align-items-center justify-content-between">
-                <div>
-                    <span class="text-secondary small text-uppercase fw-bold">Combo bắp nước</span>
-                    <h3 class="fw-bold text-white mb-0 mt-1">4</h3>
-                    <small class="text-success"><i class="bi bi-check-circle"></i> Đang bán</small>
+                    <h3 class="fw-bold text-white mb-0 mt-1" id="kpiActiveShowtimes">--</h3>
+                    <small class="text-success"><i class="bi bi-check-circle me-1"></i>Sẵn sàng chiếu</small>
                 </div>
                 <div class="rounded-3 bg-warning bg-opacity-10 text-warning p-3 fs-3">
-                    <i class="bi bi-cup-straw"></i>
+                    <i class="bi bi-calendar2-event"></i>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Tình trạng hệ thống -->
+    <!-- 4. Khách hàng mới -->
     <div class="col-sm-6 col-xl-3">
         <div class="card admin-card p-3 h-100">
             <div class="d-flex align-items-center justify-content-between">
                 <div>
-                    <span class="text-secondary small text-uppercase fw-bold">Dịch vụ ngầm</span>
-                    <h3 class="fw-bold text-success mb-0 mt-1">Active</h3>
-                    <small class="text-secondary">Quét giải phóng ghế (30s)</small>
+                    <span class="text-secondary small text-uppercase fw-bold">Khách hàng mới</span>
+                    <h3 class="fw-bold text-white mb-0 mt-1" id="kpiNewUsers">--</h3>
+                    <small class="text-info"><i class="bi bi-person-plus me-1"></i>Đăng ký hôm nay</small>
                 </div>
                 <div class="rounded-3 bg-success bg-opacity-10 text-success p-3 fs-3">
-                    <i class="bi bi-clock-history"></i>
+                    <i class="bi bi-people"></i>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- CHARTS ROW 1: Biểu đồ xu hướng doanh thu theo thời gian -->
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <div class="card admin-card shadow-lg p-3 p-md-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-3 border-bottom border-secondary border-opacity-25 gap-2">
+                <div>
+                    <h5 class="fw-bold text-white mb-1">
+                        <i class="bi bi-graph-up-arrow text-danger me-2"></i>Biểu Đồ Xu Hướng Doanh Thu
+                    </h5>
+                    <p class="text-secondary small mb-0">Theo dõi doanh thu bán vé và dịch vụ combo bắp nước</p>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-secondary active btn-period" data-days="7">7 ngày qua</button>
+                        <button type="button" class="btn btn-outline-secondary btn-period" data-days="14">14 ngày</button>
+                        <button type="button" class="btn btn-outline-secondary btn-period" data-days="30">30 ngày</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Revenue Breakdown summary badges -->
+            <div class="d-flex flex-wrap gap-3 mb-3 p-3 bg-black rounded border border-secondary border-opacity-25 small">
+                <div>
+                    <span class="text-secondary">Tổng doanh thu kỳ này:</span>
+                    <strong class="text-warning fs-6 ms-1" id="lblPeriodTotal">-- đ</strong>
+                </div>
+                <div class="border-end border-secondary border-opacity-50 d-none d-md-block"></div>
+                <div>
+                    <span class="text-secondary">Tiền vé:</span>
+                    <strong class="text-success ms-1" id="lblPeriodTicket">-- đ</strong>
+                </div>
+                <div class="border-end border-secondary border-opacity-50 d-none d-md-block"></div>
+                <div>
+                    <span class="text-secondary">Tiền Combo:</span>
+                    <strong class="text-info ms-1" id="lblPeriodCombo">-- đ</strong>
+                </div>
+                <div class="border-end border-secondary border-opacity-50 d-none d-md-block"></div>
+                <div>
+                    <span class="text-secondary">Tổng số vé đã bán:</span>
+                    <strong class="text-light ms-1" id="lblPeriodTicketsSold">-- vé</strong>
+                </div>
+            </div>
+
+            <!-- Canvas for Chart.js -->
+            <div style="position: relative; height: 320px; width: 100%;">
+                <canvas id="revenueChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CHARTS ROW 2: Top Phim & Tỷ lệ lấp đầy phòng chiếu -->
+<div class="row g-4 mb-4">
+    <!-- Top Phim Doanh Thu -->
+    <div class="col-lg-7">
+        <div class="card admin-card shadow-lg p-3 p-md-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom border-secondary border-opacity-25">
+                <div>
+                    <h5 class="fw-bold text-white mb-1">
+                        <i class="bi bi-trophy-fill text-warning me-2"></i>Top Phim Ăn Khách Nhất
+                    </h5>
+                    <p class="text-secondary small mb-0">Doanh thu và số lượt vé theo từng bộ phim</p>
+                </div>
+                <span class="badge bg-secondary">Top 5</span>
+            </div>
+            <div style="position: relative; height: 260px; width: 100%;">
+                <canvas id="topMoviesChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tỷ lệ lấp đầy phòng chiếu -->
+    <div class="col-lg-5">
+        <div class="card admin-card shadow-lg p-3 p-md-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom border-secondary border-opacity-25">
+                <div>
+                    <h5 class="fw-bold text-white mb-1">
+                        <i class="bi bi-pie-chart-fill text-info me-2"></i>Tỷ Lệ Lấp Đầy Phòng Chiếu
+                    </h5>
+                    <p class="text-secondary small mb-0">Công suất phòng (% số ghế đã bán)</p>
+                </div>
+                <span class="badge bg-secondary">30 ngày qua</span>
+            </div>
+            <div style="position: relative; height: 260px; width: 100%;">
+                <canvas id="occupancyChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Top Movies Detailed Data Table -->
+<div class="card admin-card mb-4 shadow">
+    <div class="card-header bg-black py-3 d-flex justify-content-between align-items-center">
+        <span class="fw-bold text-white">
+            <i class="bi bi-film text-danger me-2"></i>Bảng Tổng Hợp Doanh Thu Phim Phòng Vé
+        </span>
+        <a asp-action="Movies" class="btn btn-outline-light btn-sm">Quản lý Phim &raquo;</a>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle mb-0 small">
+                <thead>
+                    <tr class="text-secondary border-secondary">
+                        <th class="ps-3">Xếp hạng</th>
+                        <th>Phim</th>
+                        <th>Thời lượng</th>
+                        <th>Số suất chiếu</th>
+                        <th>Vé đã bán</th>
+                        <th class="text-end pe-3">Tổng doanh thu</th>
+                    </tr>
+                </thead>
+                <tbody id="topMoviesTableBody">
+                    <tr>
+                        <td colspan="6" class="text-center text-secondary py-3">Đang tải dữ liệu doanh thu phim...</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
@@ -105,59 +234,379 @@
         <div class="row g-3">
             @if (User.IsInRole("Admin"))
             {
-                <div class="col-md-4">
+                <div class="col-md-3 col-sm-6">
                     <a asp-action="Movies" class="card bg-dark border border-secondary text-decoration-none p-3 h-100 d-flex flex-row align-items-center hover-card">
                         <div class="bg-danger bg-opacity-10 text-danger p-3 rounded-circle me-3 fs-4">
                             <i class="bi bi-film"></i>
                         </div>
                         <div>
                             <div class="fw-bold text-white">Quản lý Phim</div>
-                            <small class="text-secondary">CRUD phim, thể loại, poster, thời lượng</small>
+                            <small class="text-secondary">CRUD phim, poster, thời lượng</small>
                         </div>
                     </a>
                 </div>
             }
 
-            <div class="col-md-4">
+            <div class="col-md-3 col-sm-6">
                 <a asp-action="Showtimes" class="card bg-dark border border-secondary text-decoration-none p-3 h-100 d-flex flex-row align-items-center hover-card">
                     <div class="bg-primary bg-opacity-10 text-primary p-3 rounded-circle me-3 fs-4">
                         <i class="bi bi-calendar2-week"></i>
                     </div>
                     <div>
                         <div class="fw-bold text-white">Suất Chiếu</div>
-                        <small class="text-secondary">Lịch chiếu, phân bổ phòng chiếu</small>
+                        <small class="text-secondary">Lịch chiếu, kiểm tra overlap</small>
                     </div>
                 </a>
             </div>
 
-            @if (User.IsInRole("Admin"))
-            {
-                <div class="col-md-4">
-                    <a asp-action="Combos" class="card bg-dark border border-secondary text-decoration-none p-3 h-100 d-flex flex-row align-items-center hover-card">
-                        <div class="bg-warning bg-opacity-10 text-warning p-3 rounded-circle me-3 fs-4">
-                            <i class="bi bi-cup-straw"></i>
-                        </div>
-                        <div>
-                            <div class="fw-bold text-white">Combo Bắp Nước</div>
-                            <small class="text-secondary">Quản lý các gói combo và giá bán</small>
-                        </div>
-                    </a>
-                </div>
-            }
-            else
-            {
-                <div class="col-md-4">
-                    <a asp-controller="Booking" asp-action="SeatMap" target="_blank" class="card bg-dark border border-secondary text-decoration-none p-3 h-100 d-flex flex-row align-items-center hover-card">
-                        <div class="bg-success bg-opacity-10 text-success p-3 rounded-circle me-3 fs-4">
-                            <i class="bi bi-grid-3x3-gap"></i>
-                        </div>
-                        <div>
-                            <div class="fw-bold text-white">Bán Vé Tại Quầy (POS)</div>
-                            <small class="text-secondary">Chọn ghế và đặt combo cho khách hàng</small>
-                        </div>
-                    </a>
-                </div>
-            }
+            <div class="col-md-3 col-sm-6">
+                <a asp-controller="Pos" asp-action="Scanner" class="card bg-dark border border-secondary text-decoration-none p-3 h-100 d-flex flex-row align-items-center hover-card">
+                    <div class="bg-info bg-opacity-10 text-info p-3 rounded-circle me-3 fs-4">
+                        <i class="bi bi-qr-code-scan"></i>
+                    </div>
+                    <div>
+                        <div class="fw-bold text-white">Soát Vé QR</div>
+                        <small class="text-secondary">Quét vé vào phòng chiếu</small>
+                    </div>
+                </a>
+            </div>
+
+            <div class="col-md-3 col-sm-6">
+                <a asp-controller="Pos" asp-action="Index" target="_blank" class="card bg-dark border border-secondary text-decoration-none p-3 h-100 d-flex flex-row align-items-center hover-card">
+                    <div class="bg-warning bg-opacity-10 text-warning p-3 rounded-circle me-3 fs-4">
+                        <i class="bi bi-display"></i>
+                    </div>
+                    <div>
+                        <div class="fw-bold text-white">Bán Vé POS</div>
+                        <small class="text-secondary">Quầy bán vé & thu tiền mặt</small>
+                    </div>
+                </a>
+            </div>
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+    <script>
+        (function () {
+            // Biến quản lý instances biểu đồ Chart.js
+            let revenueChartInstance = null;
+            let topMoviesChartInstance = null;
+            let occupancyChartInstance = null;
+
+            // 1. Tải KPI Daily Summary
+            async function loadDailySummary() {
+                try {
+                    const res = await fetch('/Admin/GetDailySummaryApi');
+                    if (res.ok) {
+                        const data = await res.json();
+                        document.getElementById('kpiTodayRevenue').textContent = (data.todayRevenue || 0).toLocaleString('vi-VN') + ' đ';
+                        document.getElementById('kpiTodayTickets').textContent = (data.todayTicketsSold || 0).toLocaleString('vi-VN');
+                        document.getElementById('kpiBookingsCount').textContent = `${data.todayBookingsCount || 0} đơn đặt vé`;
+                        document.getElementById('kpiActiveShowtimes').textContent = data.activeShowtimesCount || 0;
+                        document.getElementById('kpiNewUsers').textContent = data.newUsersCount || 0;
+
+                        const growthBadge = document.getElementById('kpiGrowthBadge');
+                        const growth = data.revenueGrowthPercentage || 0;
+                        if (growth >= 0) {
+                            growthBadge.className = 'text-success';
+                            growthBadge.innerHTML = `<i class="bi bi-arrow-up"></i> +${growth}% so với hôm qua`;
+                        } else {
+                            growthBadge.className = 'text-danger';
+                            growthBadge.innerHTML = `<i class="bi bi-arrow-down"></i> ${growth}% so với hôm qua`;
+                        }
+                    }
+                } catch (e) {
+                    console.error('Lỗi khi tải daily summary:', e);
+                }
+            }
+
+            // 2. Tải Biểu đồ Xu hướng Doanh thu (Line Chart)
+            async function loadRevenueChart(days = 7) {
+                const to = new Date();
+                const from = new Date();
+                from.setDate(to.getDate() - (days - 1));
+
+                const fromStr = from.toISOString().split('T')[0];
+                const toStr = to.toISOString().split('T')[0];
+
+                try {
+                    const res = await fetch(`/Admin/GetRevenueReportApi?from=${fromStr}&to=${toStr}`);
+                    if (!res.ok) return;
+
+                    const data = await res.json();
+
+                    document.getElementById('lblPeriodTotal').textContent = (data.totalRevenue || 0).toLocaleString('vi-VN') + ' đ';
+                    document.getElementById('lblPeriodTicket').textContent = (data.ticketRevenue || 0).toLocaleString('vi-VN') + ' đ';
+                    document.getElementById('lblPeriodCombo').textContent = (data.comboRevenue || 0).toLocaleString('vi-VN') + ' đ';
+                    document.getElementById('lblPeriodTicketsSold').textContent = (data.totalTicketsSold || 0).toLocaleString('vi-VN') + ' vé';
+
+                    const labels = data.dailyRevenues.map(d => d.date);
+                    const values = data.dailyRevenues.map(d => d.revenue);
+
+                    const ctx = document.getElementById('revenueChart').getContext('2d');
+
+                    // Gradient Fill đỏ Cinema
+                    const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+                    gradient.addColorStop(0, 'rgba(229, 9, 20, 0.45)');
+                    gradient.addColorStop(1, 'rgba(229, 9, 20, 0.0)');
+
+                    if (revenueChartInstance) {
+                        revenueChartInstance.destroy();
+                    }
+
+                    revenueChartInstance = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Doanh thu (VNĐ)',
+                                data: values,
+                                borderColor: '#e50914',
+                                borderWidth: 3,
+                                pointBackgroundColor: '#ffffff',
+                                pointBorderColor: '#e50914',
+                                pointBorderWidth: 2,
+                                pointRadius: 4,
+                                pointHoverRadius: 6,
+                                fill: true,
+                                backgroundColor: gradient,
+                                tension: 0.35
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: '#1f242e',
+                                    titleColor: '#ffffff',
+                                    bodyColor: '#e50914',
+                                    borderColor: '#374151',
+                                    borderWidth: 1,
+                                    padding: 10,
+                                    callbacks: {
+                                        label: function (context) {
+                                            return ' Doanh thu: ' + context.parsed.y.toLocaleString('vi-VN') + ' đ';
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                                    ticks: { color: '#94a3b8' }
+                                },
+                                y: {
+                                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                                    ticks: {
+                                        color: '#94a3b8',
+                                        callback: function (val) {
+                                            if (val >= 1000000) return (val / 1000000) + ' Tr';
+                                            if (val >= 1000) return (val / 1000) + ' k';
+                                            return val;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                } catch (e) {
+                    console.error('Lỗi khi vẽ biểu đồ doanh thu:', e);
+                }
+            }
+
+            // 3. Tải Top Phim & Bảng chi tiết
+            async function loadTopMovies() {
+                try {
+                    const res = await fetch('/Admin/GetTopMoviesApi?limit=5');
+                    if (!res.ok) return;
+
+                    const movies = await res.json();
+
+                    // Render bảng
+                    const tableBody = document.getElementById('topMoviesTableBody');
+                    if (movies.length === 0) {
+                        tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-secondary py-3">Chưa có dữ liệu phim phát sinh doanh thu.</td></tr>';
+                    } else {
+                        tableBody.innerHTML = movies.map((m, idx) => `
+                            <tr>
+                                <td class="ps-3"><span class="badge ${idx === 0 ? 'bg-warning text-dark' : (idx === 1 ? 'bg-secondary' : 'bg-dark border border-secondary')} fw-bold">#${idx + 1}</span></td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="fw-bold text-white">${m.title}</div>
+                                    </div>
+                                </td>
+                                <td><span class="text-secondary">${m.durationMinutes} phút</span></td>
+                                <td><span class="badge bg-secondary">${m.totalShowtimes} suất</span></td>
+                                <td><strong class="text-light">${m.totalTicketsSold.toLocaleString('vi-VN')}</strong> vé</td>
+                                <td class="text-end pe-3"><strong class="text-warning">${m.totalRevenue.toLocaleString('vi-VN')} đ</strong></td>
+                            </tr>
+                        `).join('');
+                    }
+
+                    // Render Bar Chart
+                    const labels = movies.map(m => m.title);
+                    const revenues = movies.map(m => m.totalRevenue);
+
+                    const ctx = document.getElementById('topMoviesChart').getContext('2d');
+                    if (topMoviesChartInstance) {
+                        topMoviesChartInstance.destroy();
+                    }
+
+                    topMoviesChartInstance = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Doanh thu (VNĐ)',
+                                data: revenues,
+                                backgroundColor: [
+                                    'rgba(229, 9, 20, 0.85)',
+                                    'rgba(245, 158, 11, 0.85)',
+                                    'rgba(16, 185, 129, 0.85)',
+                                    'rgba(6, 182, 212, 0.85)',
+                                    'rgba(168, 85, 247, 0.85)'
+                                ],
+                                borderRadius: 6
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: '#1f242e',
+                                    callbacks: {
+                                        label: function (ctx) {
+                                            return ' ' + ctx.parsed.y.toLocaleString('vi-VN') + ' đ';
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    grid: { display: false },
+                                    ticks: {
+                                        color: '#94a3b8',
+                                        callback: function (val, idx) {
+                                            const label = this.getLabelForValue(val);
+                                            return label.length > 15 ? label.substring(0, 15) + '...' : label;
+                                        }
+                                    }
+                                },
+                                y: {
+                                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                                    ticks: {
+                                        color: '#94a3b8',
+                                        callback: function (val) {
+                                            if (val >= 1000000) return (val / 1000000) + 'M';
+                                            if (val >= 1000) return (val / 1000) + 'k';
+                                            return val;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                } catch (e) {
+                    console.error('Lỗi khi tải top movies:', e);
+                }
+            }
+
+            // 4. Tải Tỷ Lệ Lấp Đầy Phòng Chiếu (Horizontal Bar)
+            async function loadOccupancy() {
+                try {
+                    const res = await fetch('/Admin/GetOccupancyApi');
+                    if (!res.ok) return;
+
+                    const rooms = await res.json();
+                    const labels = rooms.map(r => `${r.roomName} (${r.screenType})`);
+                    const rates = rooms.map(r => r.occupancyRatePercentage);
+
+                    const ctx = document.getElementById('occupancyChart').getContext('2d');
+                    if (occupancyChartInstance) {
+                        occupancyChartInstance.destroy();
+                    }
+
+                    occupancyChartInstance = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Tỷ lệ lấp đầy (%)',
+                                data: rates,
+                                backgroundColor: rates.map(r => r >= 50 ? 'rgba(16, 185, 129, 0.85)' : 'rgba(245, 158, 11, 0.85)'),
+                                borderRadius: 6
+                            }]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: '#1f242e',
+                                    callbacks: {
+                                        label: function (ctx) {
+                                            return ` Lấp đầy: ${ctx.parsed.x}%`;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    min: 0,
+                                    max: 100,
+                                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                                    ticks: {
+                                        color: '#94a3b8',
+                                        callback: function (val) { return val + '%'; }
+                                    }
+                                },
+                                y: {
+                                    grid: { display: false },
+                                    ticks: { color: '#94a3b8' }
+                                }
+                            }
+                        }
+                    });
+                } catch (e) {
+                    console.error('Lỗi khi tải tỷ lệ phòng:', e);
+                }
+            }
+
+            // Nút bộ lọc thời gian 7, 14, 30 ngày
+            document.querySelectorAll('.btn-period').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    document.querySelectorAll('.btn-period').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    const days = parseInt(this.getAttribute('data-days'), 10);
+                    loadRevenueChart(days);
+                });
+            });
+
+            // Nút làm mới
+            document.getElementById('btnRefreshStats').addEventListener('click', function () {
+                loadDailySummary();
+                const activeBtn = document.querySelector('.btn-period.active');
+                const days = activeBtn ? parseInt(activeBtn.getAttribute('data-days'), 10) : 7;
+                loadRevenueChart(days);
+                loadTopMovies();
+                loadOccupancy();
+            });
+
+            // Khởi chạy khi tải trang
+            loadDailySummary();
+            loadRevenueChart(7);
+            loadTopMovies();
+            loadOccupancy();
+        })();
+    </script>
+}

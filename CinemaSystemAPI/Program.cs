@@ -98,12 +98,23 @@ builder.Services.AddAuthorization();
 
 // 5. Dependency Injection Services
 builder.Services.AddSingleton<JwtService>();
+builder.Services.AddSingleton<IQrCodeService, QrCodeService>();
 builder.Services.AddScoped<IAccountRepository, AccountRepository>();
 builder.Services.AddScoped<IMovieRepository, MovieRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 
 // 6. Background Services (Task của Bách: tự động dọn dẹp giữ ghế hết hạn)
 builder.Services.AddHostedService<ExpiredSeatHoldCleanupService>();
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
 
 var app = builder.Build();
 
@@ -126,6 +137,8 @@ if (app.Environment.IsDevelopment())
 app.UseStaticFiles();
 
 app.UseRouting();
+
+app.UseCors("AllowAll");
 
 app.UseAuthentication();
 app.UseAuthorization();

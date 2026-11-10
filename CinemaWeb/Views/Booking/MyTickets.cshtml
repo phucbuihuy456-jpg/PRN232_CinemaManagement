@@ -1,0 +1,131 @@
+@model List<CinemaWeb.Models.MyTicketItemViewModel>
+@{
+    ViewData["Title"] = "Vé Đã Đặt Của Tôi";
+}
+
+<div class="container py-5">
+    <!-- Page Header -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-3 border-bottom border-secondary border-opacity-50">
+        <div>
+            <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-3 py-1 rounded-pill mb-2">
+                <i class="bi bi-ticket-perforated-fill me-1"></i> Khách Hàng
+            </span>
+            <h2 class="fw-bold text-white mb-1">Vé Xem Phim Của Tôi</h2>
+            <p class="text-secondary small mb-0">Danh sách các vé điện tử và mã QR để check-in tại quầy soát vé</p>
+        </div>
+        <div class="mt-3 mt-md-0">
+            <a asp-controller="Home" asp-action="Index" class="btn btn-outline-danger btn-sm">
+                <i class="bi bi-film me-1"></i> Đặt thêm vé mới
+            </a>
+        </div>
+    </div>
+
+    @if (Model == null || !Model.Any())
+    {
+        <div class="card bg-black border border-secondary shadow-lg rounded-4 p-5 text-center my-4">
+            <div class="py-4">
+                <i class="bi bi-ticket-detailed text-secondary opacity-25" style="font-size: 4.5rem;"></i>
+                <h4 class="text-white fw-bold mt-3">Bạn chưa có đơn đặt vé nào</h4>
+                <p class="text-secondary small mb-4">Hãy khám phá các bộ phim hot đang chiếu và đặt vé ngay hôm nay!</p>
+                <a asp-controller="Home" asp-action="Index" class="btn btn-danger rounded-pill px-4 fw-semibold">
+                    <i class="bi bi-play-circle me-1"></i> Xem Phim Đang Chiếu
+                </a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row g-4">
+            @foreach (var ticket in Model)
+            {
+                <div class="col-lg-6">
+                    <div class="card bg-dark border border-secondary shadow-lg rounded-4 overflow-hidden h-100">
+                        <div class="card-header bg-black border-secondary py-3 d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="badge bg-danger me-2">Mã đơn: #@ticket.Id</span>
+                                <small class="text-secondary font-monospace">@ticket.CreatedAt.ToString("dd/MM/yyyy HH:mm")</small>
+                            </div>
+                            <div>
+                                @if (ticket.Status == "Completed")
+                                {
+                                    <span class="badge bg-success"><i class="bi bi-check-all me-1"></i>Đã vào xem (Completed)</span>
+                                }
+                                else if (ticket.Status == "Cancelled")
+                                {
+                                    <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Đã hủy</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-warning text-dark fw-bold"><i class="bi bi-clock-history me-1"></i>Chưa soát vé (Confirmed)</span>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="card-body p-4">
+                            <div class="row g-3 align-items-center">
+                                <!-- QR Code -->
+                                <div class="col-sm-5 text-center border-end border-secondary border-opacity-50">
+                                    <div class="p-2 bg-white d-inline-block rounded shadow mb-2">
+                                        <img src="@(string.IsNullOrEmpty(ticket.QrCodeBase64) ? $"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={ticket.QrCodeToken}" : ticket.QrCodeBase64)"
+                                             alt="QR Code"
+                                             class="img-fluid"
+                                             style="width: 140px; height: 140px;" />
+                                    </div>
+                                    <div class="text-secondary small font-monospace mt-1">
+                                        <span class="text-warning small fw-bold">@ticket.QrCodeToken</span>
+                                    </div>
+                                    <div class="text-secondary small fst-italic mt-1" style="font-size: 0.75rem;">
+                                        Đưa mã này cho nhân viên soát vé
+                                    </div>
+                                </div>
+
+                                <!-- Movie and Seats Info -->
+                                <div class="col-sm-7 ps-sm-3">
+                                    <h5 class="text-white fw-bold mb-2">@ticket.MovieTitle</h5>
+                                    
+                                    <div class="text-secondary small mb-2">
+                                        <div><i class="bi bi-door-open text-warning me-1"></i>Phòng: <strong class="text-light">@ticket.RoomName</strong></div>
+                                        <div><i class="bi bi-clock text-info me-1"></i>Suất chiếu: <strong class="text-light">@ticket.StartTime.ToString("HH:mm dd/MM/yyyy")</strong></div>
+                                    </div>
+
+                                    <div class="mb-2">
+                                        <span class="text-secondary small d-block mb-1">Ghế đã đặt:</span>
+                                        <div class="d-flex flex-wrap gap-1">
+                                            @foreach (var s in ticket.Seats)
+                                            {
+                                                <span class="badge bg-danger fs-6 px-2 py-1">@s</span>
+                                            }
+                                        </div>
+                                    </div>
+
+                                    @if (ticket.Combos != null && ticket.Combos.Any())
+                                    {
+                                        <div class="mb-2">
+                                            <span class="text-secondary small d-block mb-1">Bắp nước:</span>
+                                            <div class="small text-info">
+                                                @string.Join(", ", ticket.Combos)
+                                            </div>
+                                        </div>
+                                    }
+
+                                    <div class="pt-2 border-top border-secondary text-end">
+                                        <span class="text-secondary small me-2">Tổng tiền:</span>
+                                        <span class="fs-5 fw-bold text-warning">@ticket.TotalAmount.ToString("N0") đ</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card-footer bg-black border-secondary py-2 px-4 d-flex justify-content-between align-items-center">
+                            <span class="text-secondary small"><i class="bi bi-credit-card me-1"></i>@ticket.PaymentMethod (@ticket.PaymentStatus)</span>
+                            <a asp-action="Success" asp-route-bookingId="@ticket.Id" class="btn btn-sm btn-outline-light">
+                                <i class="bi bi-printer me-1"></i> Xem chi tiết / In vé
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+

@@ -10,6 +10,20 @@ namespace CinemaWeb.Controllers
     [Authorize(Roles = "Admin,Staff")]
     public class AdminController : Controller
     {
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly string _apiBaseUrl;
+        private readonly ILogger<AdminController> _logger;
+
+        public AdminController(
+            IHttpClientFactory httpClientFactory,
+            IConfiguration configuration,
+            ILogger<AdminController> logger)
+        {
+            _httpClientFactory = httpClientFactory;
+            _apiBaseUrl = configuration["ApiSettings:BaseUrl"] ?? "http://localhost:5027";
+            _logger = logger;
+        }
+
         // 1. Dashboard (Bảng điều khiển chung)
         [HttpGet]
         public IActionResult Index()
@@ -55,5 +69,97 @@ namespace CinemaWeb.Controllers
         {
             return View();
         }
+
+        #region Reports API Proxies for Chart.js Dashboard
+
+        [AllowAnonymous]
+        [HttpGet]
+        public async Task<IActionResult> GetDailySummaryApi()
+        {
+            var client = _httpClientFactory.CreateClient();
+            try
+            {
+                var response = await client.GetAsync($"{_apiBaseUrl}/api/reports/daily-summary");
+                var content = await response.Content.ReadAsStringAsync();
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(content, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi gọi API reports daily-summary");
+                return StatusCode(500, new { message = "Lỗi kết nối máy chủ báo cáo." });
+            }
+        }
+
+        [AllowAnonymous]
+        [HttpGet]
+        public async Task<IActionResult> GetRevenueReportApi([FromQuery] string? from, [FromQuery] string? to)
+        {
+            var client = _httpClientFactory.CreateClient();
+            try
+            {
+                var url = $"{_apiBaseUrl}/api/reports/revenue";
+                var queryParams = new List<string>();
+                if (!string.IsNullOrEmpty(from)) queryParams.Add($"from={from}");
+                if (!string.IsNullOrEmpty(to)) queryParams.Add($"to={to}");
+                if (queryParams.Any()) url += "?" + string.Join("&", queryParams);
+
+                var response = await client.GetAsync(url);
+                var content = await response.Content.ReadAsStringAsync();
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(content, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi gọi API reports revenue");
+                return StatusCode(500, new { message = "Lỗi kết nối máy chủ báo cáo." });
+            }
+        }
+
+        [AllowAnonymous]
+        [HttpGet]
+        public async Task<IActionResult> GetTopMoviesApi([FromQuery] int limit = 5)
+        {
+            var client = _httpClientFactory.CreateClient();
+            try
+            {
+                var response = await client.GetAsync($"{_apiBaseUrl}/api/reports/top-movies?limit={limit}");
+                var content = await response.Content.ReadAsStringAsync();
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(content, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi gọi API reports top-movies");
+                return StatusCode(500, new { message = "Lỗi kết nối máy chủ báo cáo." });
+            }
+        }
+
+        [AllowAnonymous]
+        [HttpGet]
+        public async Task<IActionResult> GetOccupancyApi([FromQuery] string? from, [FromQuery] string? to)
+        {
+            var client = _httpClientFactory.CreateClient();
+            try
+            {
+                var url = $"{_apiBaseUrl}/api/reports/occupancy";
+                var queryParams = new List<string>();
+                if (!string.IsNullOrEmpty(from)) queryParams.Add($"from={from}");
+                if (!string.IsNullOrEmpty(to)) queryParams.Add($"to={to}");
+                if (queryParams.Any()) url += "?" + string.Join("&", queryParams);
+
+                var response = await client.GetAsync(url);
+                var content = await response.Content.ReadAsStringAsync();
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(content, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi gọi API reports occupancy");
+                return StatusCode(500, new { message = "Lỗi kết nối máy chủ báo cáo." });
+            }
+        }
+
+        #endregion
     }
 }

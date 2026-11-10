@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="utf-8" />
@@ -31,7 +31,8 @@
                 <div class="collapse navbar-collapse" id="navbarCustomer">
                     <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-4 gap-lg-2">
                         <li class="nav-item">
-                            <a class="nav-link active" asp-controller="Home" asp-action="Index">
+                        <li class="nav-item">
+                            <a class="nav-link" asp-controller="Home" asp-action="Index">
                                 <i class="bi bi-house-door me-1"></i> Trang Chủ
                             </a>
                         </li>
@@ -45,6 +46,19 @@
                                 <i class="bi bi-grid-3x3-gap me-1"></i> Đặt Vé Nhanh
                             </a>
                         </li>
+                        @if (User.IsInRole("Admin") || User.IsInRole("Staff"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-warning fw-semibold" asp-controller="Pos" asp-action="Index">
+                                    <i class="bi bi-display me-1"></i> Bán vé POS
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-info fw-semibold" asp-controller="Pos" asp-action="Scanner">
+                                    <i class="bi bi-qr-code-scan me-1"></i> Soát Vé QR
+                                </a>
+                            </li>
+                        }
                     </ul>
 
                     <div class="d-flex align-items-center gap-3">
@@ -71,7 +85,7 @@
     <li><a class="dropdown-item text-warning fw-semibold" asp-controller="Admin" asp-action="Index"><i class="bi bi-speedometer2 me-2"></i>Trang Quản Trị</a></li>
 }
 <li><a class="dropdown-item" href="#"><i class="bi bi-person me-2"></i>Thông tin cá nhân</a></li>
-                                    <li><a class="dropdown-item" href="#"><i class="bi bi-ticket-detailed me-2"></i>Vé đã đặt</a></li>
+                                    <li><a class="dropdown-item" asp-controller="Booking" asp-action="MyTickets"><i class="bi bi-ticket-detailed me-2"></i>Vé đã đặt (Lịch sử)</a></li>
                                     <li><hr class="dropdown-divider border-secondary"></li>
                                     <li>
                                         <a class="dropdown-item text-danger" asp-controller="Account" asp-action="Logout">
