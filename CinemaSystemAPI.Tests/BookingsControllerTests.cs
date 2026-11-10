@@ -78,7 +78,8 @@ namespace CinemaSystemAPI.Tests
         {
             // Arrange
             using var context = CreateInMemoryDbContext("Db_Hold_Success");
-            var controller = new BookingsController(context, NullLogger<BookingsController>.Instance);
+            var qrService = new CinemaSystemAPI.Services.QrCodeService();
+            var controller = new BookingsController(context, NullLogger<BookingsController>.Instance, qrService);
 
             var request = new HoldSeatsRequestDto
             {
@@ -107,7 +108,8 @@ namespace CinemaSystemAPI.Tests
         {
             // Arrange
             using var context = CreateInMemoryDbContext("Db_Hold_Conflict");
-            var controller = new BookingsController(context, NullLogger<BookingsController>.Instance);
+            var qrService = new CinemaSystemAPI.Services.QrCodeService();
+            var controller = new BookingsController(context, NullLogger<BookingsController>.Instance, qrService);
 
             // Người 1 giữ ghế 1
             await controller.HoldSeats(new HoldSeatsRequestDto
@@ -136,7 +138,8 @@ namespace CinemaSystemAPI.Tests
         {
             // Arrange
             using var context = CreateInMemoryDbContext("Db_Hold_Sold_Conflict");
-            var controller = new BookingsController(context, NullLogger<BookingsController>.Instance);
+            var qrService = new CinemaSystemAPI.Services.QrCodeService();
+            var controller = new BookingsController(context, NullLogger<BookingsController>.Instance, qrService);
 
             // Tạo một đơn đặt vé Confirmed cho ghế 1
             var booking = new Booking
@@ -169,7 +172,8 @@ namespace CinemaSystemAPI.Tests
         {
             // Arrange (Task 32)
             using var context = CreateInMemoryDbContext("Db_Cancel_Success");
-            var controller = new BookingsController(context, NullLogger<BookingsController>.Instance);
+            var qrService = new CinemaSystemAPI.Services.QrCodeService();
+            var controller = new BookingsController(context, NullLogger<BookingsController>.Instance, qrService);
 
             var booking = new Booking
             {
@@ -225,7 +229,8 @@ namespace CinemaSystemAPI.Tests
         {
             // Arrange: Suất chiếu trong quá khứ
             using var context = CreateInMemoryDbContext("Db_Cancel_Past_Showtime");
-            var controller = new BookingsController(context, NullLogger<BookingsController>.Instance);
+            var qrService = new CinemaSystemAPI.Services.QrCodeService();
+            var controller = new BookingsController(context, NullLogger<BookingsController>.Instance, qrService);
 
             var pastShowtime = new Showtime
             {
@@ -264,7 +269,8 @@ namespace CinemaSystemAPI.Tests
             // Arrange (Task 33: Concurrency & Race condition test)
             // Giả lập 2 người dùng gửi request giữ cùng Ghế 5 tại cùng 1 mili-giây
             using var context = CreateInMemoryDbContext("Db_Concurrency_Hold");
-            var controller = new BookingsController(context, NullLogger<BookingsController>.Instance);
+            var qrService = new CinemaSystemAPI.Services.QrCodeService();
+            var controller = new BookingsController(context, NullLogger<BookingsController>.Instance, qrService);
 
             var task1 = controller.HoldSeats(new HoldSeatsRequestDto
             {
@@ -291,6 +297,73 @@ namespace CinemaSystemAPI.Tests
             // Tính toàn vẹn của SeatHolds trong CSDL: Chỉ có duy nhất 1 bản ghi SeatHold cho Ghế 5
             var holdsForSeat5 = await context.SeatHolds.Where(h => h.ShowtimeId == 1 && h.SeatId == 5).ToListAsync();
             Assert.Single(holdsForSeat5);
+        }
+
+        [Fact]
+        public async Task CheckIn_ValidToken_ReturnsSuccess()
+        {
+            // Arrange
+            using var context = CreateInMemoryDbContext("CheckIn_Valid_Db");
+            var qrService = new CinemaSystemAPI.Services.QrCodeService();
+            var controller = new BookingsController(context, NullLogger<BookingsController>.Instance, qrService);
+
+            var booking = new Booking
+            {
+                Id = 10,
+                ShowtimeId = 1,
+                UserId = 1,
+                TotalAmount = 100000,
+                Status = "Confirmed",
+                PaymentStatus = "Paid",
+                QrCodeToken = "TEST_QR_TOKEN_123"
+            };
+            context.Bookings.Add(booking);
+            context.BookingSeats.Add(new BookingSeat { BookingId = 10, SeatId = 1, Price = 100000 });
+            await context.SaveChangesAsync();
+
+            // Act
+            var actionResult = await controller.CheckInByQrToken(new CheckInRequestDto { QrCodeToken = "TEST_QR_TOKEN_123" });
+
+            // Assert
+            var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+            var response = Assert.IsType<CheckInResponseDto>(okResult.Value);
+            Assert.True(response.Success);
+            Assert.Equal("Completed", response.Status);
+
+            // CSDL updated
+            var updated = await context.Bookings.FindAsync(10);
+            Assert.Equal("Completed", updated?.Status);
+        }
+
+        [Fact]
+        public async Task CheckIn_AlreadyCompleted_ReturnsConflict()
+        {
+            // Arrange
+            using var context = CreateInMemoryDbContext("CheckIn_Already_Db");
+            var qrService = new CinemaSystemAPI.Services.QrCodeService();
+            var controller = new BookingsController(context, NullLogger<BookingsController>.Instance, qrService);
+
+            var booking = new Booking
+            {
+                Id = 11,
+                ShowtimeId = 1,
+                UserId = 1,
+                TotalAmount = 100000,
+                Status = "Completed",
+                PaymentStatus = "Paid",
+                QrCodeToken = "TEST_ALREADY_USED_TOKEN"
+            };
+            context.Bookings.Add(booking);
+            context.BookingSeats.Add(new BookingSeat { BookingId = 11, SeatId = 1, Price = 100000 });
+            await context.SaveChangesAsync();
+
+            // Act
+            var actionResult = await controller.CheckInByQrToken(new CheckInRequestDto { QrCodeToken = "TEST_ALREADY_USED_TOKEN" });
+
+            // Assert
+            var conflictResult = Assert.IsType<ConflictObjectResult>(actionResult.Result);
+            var response = Assert.IsType<CheckInResponseDto>(conflictResult.Value);
+            Assert.False(response.Success);
         }
     }
 }

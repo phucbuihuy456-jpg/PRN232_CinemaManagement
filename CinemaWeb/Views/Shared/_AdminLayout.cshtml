@@ -90,10 +90,19 @@
                 </a>
             }
 
-            <div class="admin-menu-header mt-3">Cổng Bán Vé</div>
+            <div class="admin-menu-header mt-3">Quầy Vé & Soát Vé</div>
+            <a asp-controller="Pos" asp-action="Index" class="admin-nav-link text-warning" target="_blank">
+                <i class="bi bi-display"></i>
+                <span>Bán vé POS</span>
+                <i class="bi bi-box-arrow-up-right ms-auto" style="font-size: 0.8rem;"></i>
+            </a>
+            <a asp-controller="Pos" asp-action="Scanner" class="admin-nav-link text-info @(ViewContext.RouteData.Values["controller"]?.ToString() == "Pos" && ViewContext.RouteData.Values["action"]?.ToString() == "Scanner" ? "active" : "")">
+                <i class="bi bi-qr-code-scan"></i>
+                <span>Soát vé QR Scanner</span>
+            </a>
             <a asp-controller="Booking" asp-action="SeatMap" class="admin-nav-link" target="_blank">
                 <i class="bi bi-grid-3x3-gap"></i>
-                <span>Sơ đồ ghế (POS)</span>
+                <span>Sơ đồ ghế (Web)</span>
                 <i class="bi bi-box-arrow-up-right ms-auto" style="font-size: 0.8rem;"></i>
             </a>
         </div>

@@ -4,6 +4,7 @@ namespace CinemaWeb.Models
     {
         public int BookingId { get; set; }
         public string QrCodeToken { get; set; } = string.Empty;
+        public string QrCodeBase64 { get; set; } = string.Empty;
         public decimal TotalAmount { get; set; }
         public string Status { get; set; } = string.Empty;
         public string PaymentStatus { get; set; } = string.Empty;

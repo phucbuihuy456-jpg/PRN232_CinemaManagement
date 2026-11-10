@@ -12,13 +12,15 @@ namespace CinemaSystemAPI.Controllers
     {
         private readonly CinemaDbContext _context;
         private readonly ILogger<BookingsController> _logger;
+        private readonly Services.IQrCodeService _qrCodeService;
         // Khóa đồng bộ hóa chống Race Condition khi 2 người cùng chọn 1 ghế tại cùng 1 mili-giây (Task 33)
         private static readonly SemaphoreSlim _holdLock = new(1, 1);
 
-        public BookingsController(CinemaDbContext context, ILogger<BookingsController> logger)
+        public BookingsController(CinemaDbContext context, ILogger<BookingsController> logger, Services.IQrCodeService qrCodeService)
         {
             _context = context;
             _logger = logger;
+            _qrCodeService = qrCodeService;
         }
 
         /// <summary>
@@ -361,6 +363,7 @@ namespace CinemaSystemAPI.Controllers
                 {
                     BookingId = booking.Id,
                     QrCodeToken = qrCodeToken,
+                    QrCodeBase64 = _qrCodeService.GenerateQrCodeBase64(qrCodeToken),
                     TotalAmount = totalAmount,
                     Status = booking.Status,
                     PaymentStatus = booking.PaymentStatus,
@@ -609,6 +612,218 @@ namespace CinemaSystemAPI.Controllers
                     message = "Đã xảy ra sự cố trong quá trình hủy vé. Giao dịch đã được hoàn tác an toàn."
                 });
             }
+        }
+
+        /// <summary>
+        /// Check-in soát vé vào rạp theo Booking ID (Staff, Admin).
+        /// Cập nhật Status sang 'Completed' nếu vé hợp lệ.
+        /// </summary>
+        [HttpPut("{id:int}/check-in")]
+        public async Task<ActionResult<CheckInResponseDto>> CheckInById(int id)
+        {
+            var booking = await _context.Bookings
+                .Include(b => b.Showtime).ThenInclude(s => s.Movie)
+                .Include(b => b.Showtime).ThenInclude(s => s.Room)
+                .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
+                .Include(b => b.BookingCombos).ThenInclude(bc => bc.Combo)
+                .Include(b => b.User)
+                .FirstOrDefaultAsync(b => b.Id == id);
+
+            if (booking == null)
+            {
+                return NotFound(new CheckInResponseDto
+                {
+                    Success = false,
+                    Message = $"Không tìm thấy đơn đặt vé với mã #{id}!"
+                });
+            }
+
+            return await ExecuteCheckInAsync(booking);
+        }
+
+        /// <summary>
+        /// Check-in soát vé trực tiếp bằng quét mã QR Token từ Web Camera (Staff, Admin).
+        /// </summary>
+        [HttpPost("check-in-qr")]
+        public async Task<ActionResult<CheckInResponseDto>> CheckInByQrToken([FromBody] CheckInRequestDto request)
+        {
+            if (string.IsNullOrWhiteSpace(request?.QrCodeToken))
+            {
+                return BadRequest(new CheckInResponseDto
+                {
+                    Success = false,
+                    Message = "Mã QR Code Token không được để trống!"
+                });
+            }
+
+            var token = request.QrCodeToken.Trim();
+            var booking = await _context.Bookings
+                .Include(b => b.Showtime).ThenInclude(s => s.Movie)
+                .Include(b => b.Showtime).ThenInclude(s => s.Room)
+                .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
+                .Include(b => b.BookingCombos).ThenInclude(bc => bc.Combo)
+                .Include(b => b.User)
+                .FirstOrDefaultAsync(b => b.QrCodeToken == token);
+
+            if (booking == null)
+            {
+                return NotFound(new CheckInResponseDto
+                {
+                    Success = false,
+                    Message = $"Mã QR không hợp lệ! Không tìm thấy vé tương ứng trên hệ thống."
+                });
+            }
+
+            return await ExecuteCheckInAsync(booking);
+        }
+
+        /// <summary>
+        /// Xuất ảnh QR Code (image/png) trực tiếp từ thư viện QRCoder cho một đơn đặt vé.
+        /// </summary>
+        [HttpGet("{id:int}/qr-image")]
+        public async Task<IActionResult> GetQrImage(int id)
+        {
+            var booking = await _context.Bookings
+                .AsNoTracking()
+                .FirstOrDefaultAsync(b => b.Id == id);
+
+            if (booking == null || string.IsNullOrWhiteSpace(booking.QrCodeToken))
+            {
+                return NotFound(new { message = "Không tìm thấy vé hoặc mã QR tương ứng." });
+            }
+
+            var pngBytes = _qrCodeService.GenerateQrCodePng(booking.QrCodeToken);
+            return File(pngBytes, "image/png");
+        }
+
+        /// <summary>
+        /// Lấy lịch sử đặt vé của khách hàng hiện tại (theo User ID trong JWT).
+        /// </summary>
+        [HttpGet("my-history")]
+        public async Task<IActionResult> GetMyBookingHistory()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!int.TryParse(userIdClaim, out int userId))
+            {
+                // Fallback nếu gọi qua test hoặc không có claim thì kiểm tra Header
+                var headerUserId = Request.Headers["X-User-Id"].FirstOrDefault();
+                if (!int.TryParse(headerUserId, out userId))
+                {
+                    userId = 3; // Mặc định khách hàng mẫu customer@gmail.com
+                }
+            }
+
+            var bookings = await _context.Bookings
+                .AsNoTracking()
+                .Include(b => b.Showtime).ThenInclude(s => s.Movie)
+                .Include(b => b.Showtime).ThenInclude(s => s.Room)
+                .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
+                .Include(b => b.BookingCombos).ThenInclude(bc => bc.Combo)
+                .Include(b => b.Payments)
+                .Where(b => b.UserId == userId)
+                .OrderByDescending(b => b.CreatedAt)
+                .Select(b => new
+                {
+                    b.Id,
+                    b.QrCodeToken,
+                    QrCodeBase64 = _qrCodeService.GenerateQrCodeBase64(b.QrCodeToken ?? ""),
+                    b.TotalAmount,
+                    b.Status,
+                    b.PaymentStatus,
+                    b.CreatedAt,
+                    MovieTitle = b.Showtime.Movie.Title,
+                    PosterUrl = b.Showtime.Movie.PosterUrl,
+                    RoomName = b.Showtime.Room.Name,
+                    StartTime = b.Showtime.StartTime,
+                    EndTime = b.Showtime.EndTime,
+                    Seats = b.BookingSeats.Select(s => $"{s.Seat.RowCode}{s.Seat.SeatNumber}").ToList(),
+                    Combos = b.BookingCombos.Select(c => $"{c.Combo.Name} x{c.Quantity}").ToList(),
+                    PaymentMethod = b.Payments.OrderByDescending(p => p.CreatedAt).Select(p => p.PaymentMethod).FirstOrDefault() ?? "EWallet"
+                })
+                .ToListAsync();
+
+            return Ok(bookings);
+        }
+
+        private async Task<ActionResult<CheckInResponseDto>> ExecuteCheckInAsync(Booking booking)
+        {
+            var seatNames = booking.BookingSeats.Select(bs => $"{bs.Seat.RowCode}{bs.Seat.SeatNumber}").ToList();
+            var comboNames = booking.BookingCombos.Select(bc => $"{bc.Combo.Name} x{bc.Quantity}").ToList();
+            var showtimeStr = $"{booking.Showtime.StartTime:dd/MM/yyyy HH:mm} - {booking.Showtime.EndTime:HH:mm}";
+
+            // 1. Kiểm tra vé đã check-in chưa
+            if (booking.Status == "Completed")
+            {
+                return Conflict(new CheckInResponseDto
+                {
+                    Success = false,
+                    BookingId = booking.Id,
+                    QrCodeToken = booking.QrCodeToken ?? "",
+                    Status = booking.Status,
+                    CheckedInAt = booking.UpdatedAt,
+                    MovieTitle = booking.Showtime.Movie.Title,
+                    RoomName = booking.Showtime.Room.Name,
+                    Showtime = showtimeStr,
+                    Seats = seatNames,
+                    Combos = comboNames,
+                    CustomerName = booking.User?.FullName ?? "Khách vãng lai tại quầy",
+                    CustomerPhone = booking.User?.PhoneNumber,
+                    TotalAmount = booking.TotalAmount,
+                    Message = $"CẢNH BÁO: Vé #{booking.Id} ĐÃ ĐƯỢC CHECK-IN vào lúc {booking.UpdatedAt:HH:mm dd/MM/yyyy}!"
+                });
+            }
+
+            // 2. Kiểm tra vé bị hủy
+            if (booking.Status == "Cancelled")
+            {
+                return BadRequest(new CheckInResponseDto
+                {
+                    Success = false,
+                    BookingId = booking.Id,
+                    QrCodeToken = booking.QrCodeToken ?? "",
+                    Status = booking.Status,
+                    Message = $"VÉ KHÔNG HỢP LỆ: Vé #{booking.Id} đã bị HỦY và HOÀN TIỀN!"
+                });
+            }
+
+            // 3. Kiểm tra thanh toán
+            if (booking.PaymentStatus != "Paid")
+            {
+                return BadRequest(new CheckInResponseDto
+                {
+                    Success = false,
+                    BookingId = booking.Id,
+                    QrCodeToken = booking.QrCodeToken ?? "",
+                    Status = booking.Status,
+                    Message = $"VÉ CHƯA THANH TOÁN: Vé #{booking.Id} có trạng thái {booking.PaymentStatus}!"
+                });
+            }
+
+            // 4. Hợp lệ -> Check-in thành công
+            booking.Status = "Completed";
+            booking.UpdatedAt = DateTime.Now;
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Nhân viên đã check-in thành công vé #{BookingId} cho phim {MovieTitle}, ghế: {Seats}",
+                booking.Id, booking.Showtime.Movie.Title, string.Join(", ", seatNames));
+
+            return Ok(new CheckInResponseDto
+            {
+                Success = true,
+                BookingId = booking.Id,
+                QrCodeToken = booking.QrCodeToken ?? "",
+                Status = booking.Status,
+                CheckedInAt = booking.UpdatedAt,
+                MovieTitle = booking.Showtime.Movie.Title,
+                RoomName = booking.Showtime.Room.Name,
+                Showtime = showtimeStr,
+                Seats = seatNames,
+                Combos = comboNames,
+                CustomerName = booking.User?.FullName ?? "Khách vãng lai tại quầy",
+                CustomerPhone = booking.User?.PhoneNumber,
+                TotalAmount = booking.TotalAmount,
+                Message = $"CHECK-IN THÀNH CÔNG! Chào mừng quý khách vào xem phim '{booking.Showtime.Movie.Title}'."
+            });
         }
     }
 }

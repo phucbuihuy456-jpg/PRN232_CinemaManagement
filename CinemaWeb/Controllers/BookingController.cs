@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using CinemaWeb.Models;
 using Microsoft.AspNetCore.Mvc;
+using QRCoder;
 
 namespace CinemaWeb.Controllers
 {
@@ -232,6 +233,39 @@ namespace CinemaWeb.Controllers
         }
 
         /// <summary>
+        /// Trang xem danh sách vé điện tử đã đặt của khách hàng.
+        /// GET: /Booking/MyTickets
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> MyTickets()
+        {
+            var client = _httpClientFactory.CreateClient();
+            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var request = new HttpRequestMessage(HttpMethod.Get, $"{_apiBaseUrl}/api/bookings/my-history");
+            if (!string.IsNullOrEmpty(userId))
+            {
+                request.Headers.Add("X-User-Id", userId);
+            }
+
+            try
+            {
+                var response = await client.SendAsync(request);
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    var list = JsonSerializer.Deserialize<List<MyTicketItemViewModel>>(content, JsonOptions);
+                    return View(list ?? new List<MyTicketItemViewModel>());
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi tải lịch sử vé đã đặt.");
+            }
+
+            return View(new List<MyTicketItemViewModel>());
+        }
+
+        /// <summary>
         /// Trang hiển thị chi tiết đặt vé thành công và Mã QR Code vé điện tử.
         /// GET: /Booking/Success?bookingId=1
         /// </summary>
@@ -249,10 +283,16 @@ namespace CinemaWeb.Controllers
 
                     if (bookingDetail != null)
                     {
+                        var qrGen = new QRCodeGenerator();
+                        using var qrData = qrGen.CreateQrCode(bookingDetail.QrCodeToken, QRCodeGenerator.ECCLevel.Q);
+                        using var qrPng = new PngByteQRCode(qrData);
+                        var qrBase64 = $"data:image/png;base64,{Convert.ToBase64String(qrPng.GetGraphic(20))}";
+
                         var model = new BookingSuccessViewModel
                         {
                             BookingId = bookingDetail.BookingId,
                             QrCodeToken = bookingDetail.QrCodeToken,
+                            QrCodeBase64 = qrBase64,
                             TotalAmount = bookingDetail.TotalAmount,
                             Status = bookingDetail.Status,
                             PaymentStatus = bookingDetail.PaymentStatus,
@@ -294,10 +334,17 @@ namespace CinemaWeb.Controllers
             }
 
             // Fallback demo model
+            var demoToken = Guid.NewGuid().ToString("N");
+            var fallbackQrGen = new QRCodeGenerator();
+            using var fallbackQrData = fallbackQrGen.CreateQrCode(demoToken, QRCodeGenerator.ECCLevel.Q);
+            using var fallbackQrPng = new PngByteQRCode(fallbackQrData);
+            var fallbackQrBase64 = $"data:image/png;base64,{Convert.ToBase64String(fallbackQrPng.GetGraphic(20))}";
+
             var fallback = new BookingSuccessViewModel
             {
                 BookingId = bookingId,
-                QrCodeToken = Guid.NewGuid().ToString("N"),
+                QrCodeToken = demoToken,
+                QrCodeBase64 = fallbackQrBase64,
                 TotalAmount = 219000,
                 Status = "Confirmed",
                 PaymentStatus = "Paid",

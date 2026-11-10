@@ -45,7 +45,7 @@
                         <!-- QR Code Area -->
                         <div class="col-md-5 text-center border-end border-secondary border-opacity-50">
                             <div class="p-3 bg-white d-inline-block rounded shadow mb-2">
-                                <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=@Model.QrCodeToken"
+                                <img src="@(string.IsNullOrEmpty(Model.QrCodeBase64) ? $"https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={Model.QrCodeToken}" : Model.QrCodeBase64)"
                                      alt="QR Code Check-in"
                                      class="img-fluid"
                                      style="width: 180px; height: 180px;" />

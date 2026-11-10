@@ -1,0 +1,516 @@
+@{
+    ViewData["Title"] = "Quét Mã QR Soát Vé Vào Rạp (Staff Scanner)";
+    Layout = "_Layout";
+}
+
+<div class="container-fluid px-4 py-4">
+    <!-- Header Top Bar -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 p-3 bg-dark rounded border border-secondary shadow-sm">
+        <div class="d-flex align-items-center gap-3">
+            <span class="badge bg-danger fs-5 px-3 py-2 fw-bold">
+                <i class="bi bi-qr-code-scan me-2"></i>STAFF QR CHECK-IN
+            </span>
+            <div>
+                <h5 class="text-white mb-0 fw-bold">Hệ Thống Soát Vé Vào Phòng Chiếu</h5>
+                <small class="text-secondary">Sử dụng Camera trực tiếp hoặc nhập mã vé thủ công</small>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2 mt-2 mt-md-0">
+            <a asp-controller="Pos" asp-action="Index" class="btn btn-outline-warning btn-sm">
+                <i class="bi bi-display me-1"></i> Bán vé POS
+            </a>
+            <a href="/" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-house me-1"></i> Trang chủ
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- LEFT COLUMN: Camera Scanner & Manual Input -->
+        <div class="col-lg-6">
+            <!-- Camera Scanner Card -->
+            <div class="card bg-black border border-secondary shadow-lg rounded-4 overflow-hidden mb-4">
+                <div class="card-header bg-dark border-secondary py-3 d-flex justify-content-between align-items-center">
+                    <span class="fw-bold text-white">
+                        <i class="bi bi-camera-video-fill text-danger me-2"></i>Web Camera Quét Mã QR
+                    </span>
+                    <span id="cameraStatusBadge" class="badge bg-secondary">Chưa kích hoạt</span>
+                </div>
+                <div class="card-body p-3 text-center">
+                    <!-- Camera Select Dropdown & Controls -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-sm-8">
+                            <select id="cameraSelect" class="form-select form-select-sm bg-dark text-light border-secondary">
+                                <option value="">-- Đang dò tìm thiết bị Camera... --</option>
+                            </select>
+                        </div>
+                        <div class="col-sm-4 d-flex gap-1">
+                            <button id="btnStartScan" class="btn btn-sm btn-success w-100 fw-semibold">
+                                <i class="bi bi-play-circle-fill me-1"></i> Bật Camera
+                            </button>
+                            <button id="btnStopScan" class="btn btn-sm btn-outline-danger d-none w-100">
+                                <i class="bi bi-stop-circle-fill me-1"></i> Tắt
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Video Viewport Frame -->
+                    <div class="position-relative mx-auto rounded-3 overflow-hidden bg-dark border border-secondary" style="max-width: 480px; min-height: 320px;">
+                        <div id="qr-reader" style="width: 100%;"></div>
+                        <div id="scannerOverlay" class="position-absolute top-50 start-50 translate-middle text-secondary text-center p-3">
+                            <i class="bi bi-camera fs-1 d-block mb-2 text-secondary opacity-50"></i>
+                            <span class="small">Bấm "Bật Camera" và hướng mã QR trên vé vào khung ngắm</span>
+                        </div>
+                    </div>
+
+                    <!-- Scanning Tips -->
+                    <div class="mt-3 text-secondary small d-flex justify-content-center gap-3">
+                        <span><i class="bi bi-lightbulb text-warning me-1"></i>Khoảng cách: 15-25cm</span>
+                        <span><i class="bi bi-brightness-high text-info me-1"></i>Ánh sáng vừa đủ</span>
+                        <span><i class="bi bi-volume-up text-success me-1"></i>Có âm thanh phản hồi</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manual Input Lookup Card -->
+            <div class="card bg-dark border border-secondary shadow rounded-4 p-3">
+                <div class="d-flex align-items-center mb-2">
+                    <i class="bi bi-keyboard text-warning me-2 fs-5"></i>
+                    <h6 class="text-white mb-0 fw-semibold">Nhập Mã Tra Cứu Vé Thủ Công</h6>
+                </div>
+                <p class="text-secondary small mb-3">Trường hợp camera không quét được hoặc mã in bị mờ</p>
+                <div class="input-group">
+                    <input type="text" id="manualInput" class="form-control bg-black text-light border-secondary font-monospace" placeholder="Nhập mã QR Token hoặc Mã đơn hàng #ID..." />
+                    <button class="btn btn-danger fw-semibold px-3" id="btnManualCheckIn">
+                        <i class="bi bi-search me-1"></i> Soát Vé
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: Real-time Check-in Result & Session Log -->
+        <div class="col-lg-6">
+            <!-- Result Display Card -->
+            <div id="resultCard" class="card bg-black border border-secondary shadow-lg rounded-4 overflow-hidden mb-4">
+                <div class="card-header bg-dark border-secondary py-3 d-flex justify-content-between align-items-center">
+                    <span class="fw-bold text-white">
+                        <i class="bi bi-ticket-perforated-fill text-warning me-2"></i>Kết Quả Soát Vé
+                    </span>
+                    <span id="resultTime" class="text-secondary small font-monospace">--:--:--</span>
+                </div>
+                <div class="card-body p-4 text-center" id="emptyState">
+                    <div class="py-5 text-secondary">
+                        <i class="bi bi-qr-code text-secondary opacity-25" style="font-size: 5rem;"></i>
+                        <h5 class="mt-3 text-light">Chưa có dữ liệu soát vé</h5>
+                        <p class="small text-secondary mb-0">Quét mã QR từ vé của khách hàng để hiển thị thông tin vào rạp</p>
+                    </div>
+                </div>
+
+                <!-- Active Ticket Detail (Initially Hidden) -->
+                <div class="card-body p-4 d-none" id="ticketDetailContent">
+                    <!-- Status Banner -->
+                    <div id="statusBanner" class="alert d-flex align-items-center mb-4 py-3 px-4 rounded-3" role="alert">
+                        <i id="statusIcon" class="bi fs-2 me-3"></i>
+                        <div>
+                            <h5 id="statusTitle" class="alert-heading fw-bold mb-1">TRẠNG THÁI VÉ</h5>
+                            <div id="statusMessage" class="small">Thông báo chi tiết kết quả kiểm tra.</div>
+                        </div>
+                    </div>
+
+                    <!-- Ticket Details Grid -->
+                    <div class="row g-3 text-start">
+                        <div class="col-12">
+                            <div class="p-3 bg-dark rounded border border-secondary">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <span class="text-secondary small text-uppercase">Bộ Phim</span>
+                                    <span id="txtBookingId" class="badge bg-danger">Mã đơn: #---</span>
+                                </div>
+                                <h4 id="txtMovieTitle" class="text-white fw-bold mb-2">---</h4>
+                                <div class="d-flex flex-wrap gap-2 text-secondary small">
+                                    <span><i class="bi bi-door-open-fill text-warning me-1"></i><strong id="txtRoomName" class="text-light">---</strong></span>
+                                    <span>•</span>
+                                    <span><i class="bi bi-clock-fill text-info me-1"></i><strong id="txtShowtime" class="text-light">---</strong></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Danh sách ghế -->
+                        <div class="col-md-6">
+                            <div class="p-3 bg-dark rounded border border-secondary h-100">
+                                <span class="text-secondary small text-uppercase d-block mb-2">
+                                    <i class="bi bi-grid-fill text-success me-1"></i>Ghế Đã Đặt
+                                </span>
+                                <div id="seatsContainer" class="d-flex flex-wrap gap-1">
+                                    <span class="badge bg-secondary">---</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Khách hàng & Combo -->
+                        <div class="col-md-6">
+                            <div class="p-3 bg-dark rounded border border-secondary h-100">
+                                <span class="text-secondary small text-uppercase d-block mb-1">
+                                    <i class="bi bi-person-fill text-info me-1"></i>Khách Hàng
+                                </span>
+                                <div id="txtCustomerName" class="text-light fw-bold">---</div>
+                                <div id="txtCustomerPhone" class="text-secondary small mb-2">---</div>
+
+                                <span class="text-secondary small text-uppercase d-block mb-1 mt-2">
+                                    <i class="bi bi-cup-straw text-warning me-1"></i>Bắp Nước
+                                </span>
+                                <div id="combosContainer" class="small text-light">Không kèm combo</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 pt-3 border-top border-secondary text-end">
+                        <span class="text-secondary small me-2">Tổng tiền:</span>
+                        <span id="txtTotalAmount" class="fs-5 fw-bold text-warning">0 đ</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Session Scan History Card -->
+            <div class="card bg-dark border border-secondary shadow rounded-4 p-3">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="text-white mb-0 fw-semibold">
+                        <i class="bi bi-clock-history text-info me-2"></i>Lịch Sử Soát Vé Trong Ca
+                    </h6>
+                    <span id="historyCountBadge" class="badge bg-black border border-secondary text-secondary">0 lượt</span>
+                </div>
+                <div class="table-responsive" style="max-height: 220px; overflow-y: auto;">
+                    <table class="table table-dark table-hover table-sm align-middle mb-0 small">
+                        <thead>
+                            <tr class="text-secondary border-secondary">
+                                <th>Thời gian</th>
+                                <th>Mã vé</th>
+                                <th>Phim & Ghế</th>
+                                <th class="text-end">Kết quả</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody">
+                            <tr id="emptyHistoryRow">
+                                <td colspan="4" class="text-center text-secondary py-3">Chưa có lượt soát vé nào trong ca làm việc này.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <!-- HTML5 QR Code Library (CDN) -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+    <script>
+        (function () {
+            let html5QrCode = null;
+            let isScanning = false;
+            let isProcessing = false;
+            let lastScannedToken = "";
+            let lastScannedTime = 0;
+            const scanHistory = [];
+
+            // Web Audio API Beep Sounds
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            function playBeep(success) {
+                try {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+
+                    if (success) {
+                        osc.frequency.setValueAtTime(880, audioCtx.currentTime); // High pleasant A5
+                        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                        osc.start();
+                        osc.stop(audioCtx.currentTime + 0.15);
+                    } else {
+                        osc.frequency.setValueAtTime(320, audioCtx.currentTime); // Low buzz
+                        gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+                        osc.start();
+                        osc.stop(audioCtx.currentTime + 0.3);
+                    }
+                } catch (e) {
+                    // Audio context blocked by browser until user gesture
+                }
+            }
+
+            // DOM Elements
+            const cameraSelect = document.getElementById("cameraSelect");
+            const btnStart = document.getElementById("btnStartScan");
+            const btnStop = document.getElementById("btnStopScan");
+            const cameraBadge = document.getElementById("cameraStatusBadge");
+            const scannerOverlay = document.getElementById("scannerOverlay");
+            const manualInput = document.getElementById("manualInput");
+            const btnManual = document.getElementById("btnManualCheckIn");
+
+            const emptyState = document.getElementById("emptyState");
+            const ticketDetailContent = document.getElementById("ticketDetailContent");
+            const statusBanner = document.getElementById("statusBanner");
+            const statusIcon = document.getElementById("statusIcon");
+            const statusTitle = document.getElementById("statusTitle");
+            const statusMessage = document.getElementById("statusMessage");
+            const resultTime = document.getElementById("resultTime");
+
+            const txtBookingId = document.getElementById("txtBookingId");
+            const txtMovieTitle = document.getElementById("txtMovieTitle");
+            const txtRoomName = document.getElementById("txtRoomName");
+            const txtShowtime = document.getElementById("txtShowtime");
+            const seatsContainer = document.getElementById("seatsContainer");
+            const txtCustomerName = document.getElementById("txtCustomerName");
+            const txtCustomerPhone = document.getElementById("txtCustomerPhone");
+            const combosContainer = document.getElementById("combosContainer");
+            const txtTotalAmount = document.getElementById("txtTotalAmount");
+
+            const historyTableBody = document.getElementById("historyTableBody");
+            const historyCountBadge = document.getElementById("historyCountBadge");
+
+            // 1. Khởi tạo danh sách Cameras
+            Html5Qrcode.getCameras().then(cameras => {
+                if (cameras && cameras.length) {
+                    cameraSelect.innerHTML = "";
+                    cameras.forEach((camera, index) => {
+                        const opt = document.createElement("option");
+                        opt.value = camera.id;
+                        opt.text = camera.label || `Camera ${index + 1}`;
+                        cameraSelect.appendChild(opt);
+                    });
+                } else {
+                    cameraSelect.innerHTML = '<option value="">Không tìm thấy Camera trên thiết bị</option>';
+                }
+            }).catch(err => {
+                cameraSelect.innerHTML = '<option value="">Chưa cấp quyền truy cập Camera</option>';
+            });
+
+            // 2. Start Camera Scan
+            btnStart.addEventListener("click", function () {
+                const cameraId = cameraSelect.value;
+                if (!cameraId) {
+                    alert("Vui lòng chọn hoặc kết nối thiết bị Camera!");
+                    return;
+                }
+
+                if (!html5QrCode) {
+                    html5QrCode = new Html5Qrcode("qr-reader");
+                }
+
+                scannerOverlay.classList.add("d-none");
+                html5QrCode.start(
+                    cameraId,
+                    {
+                        fps: 10,
+                        qrbox: { width: 250, height: 250 }
+                    },
+                    (decodedText, decodedResult) => {
+                        handleQrScanned(decodedText);
+                    },
+                    (errorMessage) => {
+                        // ignore parse frame failures
+                    }
+                ).then(() => {
+                    isScanning = true;
+                    btnStart.classList.add("d-none");
+                    btnStop.classList.remove("d-none");
+                    cameraBadge.className = "badge bg-success";
+                    cameraBadge.textContent = "Camera đang hoạt động";
+                }).catch(err => {
+                    alert("Không thể khởi động Camera: " + err);
+                    scannerOverlay.classList.remove("d-none");
+                });
+            });
+
+            // 3. Stop Camera Scan
+            btnStop.addEventListener("click", function () {
+                if (html5QrCode && isScanning) {
+                    html5QrCode.stop().then(() => {
+                        isScanning = false;
+                        btnStart.classList.remove("d-none");
+                        btnStop.classList.add("d-none");
+                        cameraBadge.className = "badge bg-secondary";
+                        cameraBadge.textContent = "Đã tắt camera";
+                        scannerOverlay.classList.remove("d-none");
+                    });
+                }
+            });
+
+            // 4. Xử lý kết quả quét từ Camera (Throttle 3 giây chống spam)
+            function handleQrScanned(token) {
+                const now = Date.now();
+                if (token === lastScannedToken && (now - lastScannedTime) < 3000) {
+                    return; // Bỏ qua quét trùng liên tục
+                }
+
+                if (isProcessing) return;
+
+                lastScannedToken = token;
+                lastScannedTime = now;
+                sendCheckInRequest({ qrCodeToken: token });
+            }
+
+            // 5. Xử lý nhập thủ công
+            btnManual.addEventListener("click", function () {
+                const val = manualInput.value.trim();
+                if (!val) {
+                    alert("Vui lòng nhập mã QR hoặc mã đơn hàng!");
+                    return;
+                }
+
+                // Nếu nhập dạng số thuần túy ví dụ: 12 -> thử soát theo BookingId
+                if (/^\d+$/.test(val)) {
+                    sendCheckInById(parseInt(val, 10));
+                } else {
+                    sendCheckInRequest({ qrCodeToken: val });
+                }
+            });
+
+            manualInput.addEventListener("keypress", function (e) {
+                if (e.key === "Enter") {
+                    btnManual.click();
+                }
+            });
+
+            // Gửi API Check-in bằng QR Token
+            async function sendCheckInRequest(payload) {
+                isProcessing = true;
+                resultTime.textContent = new Date().toLocaleTimeString("vi-VN");
+
+                try {
+                    const res = await fetch("/Pos/ProcessCheckInQr", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const data = await res.json();
+                    renderResult(res.status, data);
+                } catch (err) {
+                    renderResult(500, {
+                        success: false,
+                        message: "Lỗi kết nối tới máy chủ xác thực!"
+                    });
+                } finally {
+                    isProcessing = false;
+                }
+            }
+
+            // Gửi API Check-in bằng Booking ID
+            async function sendCheckInById(bookingId) {
+                isProcessing = true;
+                resultTime.textContent = new Date().toLocaleTimeString("vi-VN");
+
+                try {
+                    const res = await fetch(`/Pos/ProcessCheckInId?id=${bookingId}`, {
+                        method: "PUT"
+                    });
+
+                    const data = await res.json();
+                    renderResult(res.status, data);
+                } catch (err) {
+                    renderResult(500, {
+                        success: false,
+                        message: "Lỗi kết nối tới máy chủ xác thực!"
+                    });
+                } finally {
+                    isProcessing = false;
+                }
+            }
+
+            // 6. Hiển thị kết quả lên giao diện
+            function renderResult(statusCode, data) {
+                emptyState.classList.add("d-none");
+                ticketDetailContent.classList.remove("d-none");
+
+                const nowTimeStr = new Date().toLocaleTimeString("vi-VN");
+
+                // Reset Banner classes
+                statusBanner.className = "alert d-flex align-items-center mb-4 py-3 px-4 rounded-3";
+
+                if (statusCode === 200 && data.success) {
+                    // Thành công
+                    playBeep(true);
+                    statusBanner.classList.add("alert-success", "border-success");
+                    statusIcon.className = "bi bi-check-circle-fill text-success fs-2 me-3";
+                    statusTitle.textContent = "CHECK-IN THÀNH CÔNG (HỢP LỆ)";
+                    statusMessage.textContent = data.message || "Vé hợp lệ, chúc quý khách xem phim vui vẻ!";
+
+                    addHistoryItem(nowTimeStr, data.bookingId, data.movieTitle, data.seats, "Hợp lệ", "success");
+                } else if (statusCode === 409) {
+                    // Trùng lặp - Đã soát trước đó
+                    playBeep(false);
+                    statusBanner.classList.add("alert-warning", "border-warning");
+                    statusIcon.className = "bi bi-exclamation-triangle-fill text-warning fs-2 me-3";
+                    statusTitle.textContent = "VÉ ĐÃ SỬ DỤNG TRƯỚC ĐÓ";
+                    statusMessage.textContent = data.message || "Vé này đã được check-in vào rạp!";
+
+                    addHistoryItem(nowTimeStr, data.bookingId || "---", data.movieTitle || "---", data.seats || [], "Đã dùng", "warning");
+                } else {
+                    // Lỗi vé không hợp lệ / Hủy
+                    playBeep(false);
+                    statusBanner.classList.add("alert-danger", "border-danger");
+                    statusIcon.className = "bi bi-x-circle-fill text-danger fs-2 me-3";
+                    statusTitle.textContent = "VÉ KHÔNG HỢP LỆ";
+                    statusMessage.textContent = data.message || "Mã vé không tồn tại hoặc chưa thanh toán!";
+
+                    addHistoryItem(nowTimeStr, data.bookingId || "---", data.movieTitle || "Không rõ", [], "Từ chối", "danger");
+                }
+
+                // Điền chi tiết vé
+                txtBookingId.textContent = data.bookingId ? `Mã đơn: #${data.bookingId}` : "Mã: Không hợp lệ";
+                txtMovieTitle.textContent = data.movieTitle || "---";
+                txtRoomName.textContent = data.roomName || "---";
+                txtShowtime.textContent = data.showtime || "---";
+
+                // Render seats pills
+                seatsContainer.innerHTML = "";
+                if (data.seats && data.seats.length) {
+                    data.seats.forEach(s => {
+                        const pill = document.createElement("span");
+                        pill.className = "badge bg-danger fs-6 px-2 py-1";
+                        pill.textContent = s;
+                        seatsContainer.appendChild(pill);
+                    });
+                } else {
+                    seatsContainer.innerHTML = '<span class="text-secondary small">Không có thông tin</span>';
+                }
+
+                txtCustomerName.textContent = data.customerName || "Khách hàng vãng lai";
+                txtCustomerPhone.textContent = data.customerPhone ? `SĐT: ${data.customerPhone}` : "Không có SĐT";
+
+                // Render combos
+                combosContainer.innerHTML = "";
+                if (data.combos && data.combos.length) {
+                    combosContainer.innerHTML = data.combos.map(c => `<div><i class="bi bi-check-circle-fill text-success me-1"></i>${c}</div>`).join("");
+                } else {
+                    combosContainer.textContent = "Không kèm bắp nước";
+                }
+
+                txtTotalAmount.textContent = (data.totalAmount ? data.totalAmount.toLocaleString("vi-VN") : "0") + " đ";
+            }
+
+            // 7. Ghi vào lịch sử phiên làm việc
+            function addHistoryItem(timeStr, bookingId, movieTitle, seats, resultText, badgeType) {
+                const emptyRow = document.getElementById("emptyHistoryRow");
+                if (emptyRow) emptyRow.remove();
+
+                const seatStr = seats && seats.length ? `[${seats.join(", ")}]` : "";
+
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td class="font-monospace text-secondary">${timeStr}</td>
+                    <td><strong class="text-light">#${bookingId}</strong></td>
+                    <td><div class="text-truncate" style="max-width: 180px;">${movieTitle} <small class="text-warning">${seatStr}</small></div></td>
+                    <td class="text-end"><span class="badge bg-${badgeType}">${resultText}</span></td>
+                `;
+
+                historyTableBody.insertBefore(row, historyTableBody.firstChild);
+
+                scanHistory.push({ timeStr, bookingId, resultText });
+                historyCountBadge.textContent = `${scanHistory.length} lượt`;
+            }
+        })();
+    </script>
+}
+

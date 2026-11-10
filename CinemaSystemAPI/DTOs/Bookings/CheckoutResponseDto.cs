@@ -13,6 +13,11 @@ namespace CinemaSystemAPI.DTOs.Bookings
         public string QrCodeToken { get; set; } = string.Empty;
 
         /// <summary>
+        /// Chuỗi Data URI base64 của mã QR (sinh bởi QRCoder) hiển thị trực tiếp dạng ảnh.
+        /// </summary>
+        public string QrCodeBase64 { get; set; } = string.Empty;
+
+        /// <summary>
         /// Tổng số tiền thanh toán (vé + combo).
         /// </summary>
         public decimal TotalAmount { get; set; }

@@ -207,6 +207,63 @@ namespace CinemaWeb.Controllers
             }
         }
 
+        /// <summary>
+        /// Giao diện Web Camera QR Scanner soát vé cho Staff & Admin.
+        /// GET: /Pos/Scanner
+        /// </summary>
+        [HttpGet]
+        public IActionResult Scanner()
+        {
+            return View();
+        }
+
+        /// <summary>
+        /// API Proxy xử lý Check-in bằng mã QR Token từ Camera.
+        /// POST: /Pos/ProcessCheckInQr
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> ProcessCheckInQr([FromBody] JsonElement payload)
+        {
+            var client = _httpClientFactory.CreateClient();
+            try
+            {
+                var content = new StringContent(payload.ToString(), Encoding.UTF8, "application/json");
+                var response = await client.PostAsync($"{_apiBaseUrl}/api/bookings/check-in-qr", content);
+                var resString = await response.Content.ReadAsStringAsync();
+
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(resString, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi kết nối khi gửi yêu cầu check-in QR tới Backend API.");
+                return StatusCode(500, new { message = "Không thể kết nối đến máy chủ xác thực vé!" });
+            }
+        }
+
+        /// <summary>
+        /// API Proxy xử lý Check-in bằng Booking ID thủ công.
+        /// PUT: /Pos/ProcessCheckInId/{id}
+        /// </summary>
+        [HttpPut]
+        public async Task<IActionResult> ProcessCheckInId(int id)
+        {
+            var client = _httpClientFactory.CreateClient();
+            try
+            {
+                var response = await client.PutAsync($"{_apiBaseUrl}/api/bookings/{id}/check-in", null);
+                var resString = await response.Content.ReadAsStringAsync();
+
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(resString, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi kết nối khi gửi yêu cầu check-in ID #{BookingId} tới Backend API.", id);
+                return StatusCode(500, new { message = "Không thể kết nối đến máy chủ xác thực vé!" });
+            }
+        }
+
         private static List<PosShowtimeItem> CreateFallbackShowtimes()
         {
             var today = DateTime.Today;

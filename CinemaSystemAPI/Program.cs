@@ -98,6 +98,7 @@ builder.Services.AddAuthorization();
 
 // 5. Dependency Injection Services
 builder.Services.AddSingleton<JwtService>();
+builder.Services.AddSingleton<IQrCodeService, QrCodeService>();
 builder.Services.AddScoped<IAccountRepository, AccountRepository>();
 builder.Services.AddScoped<IMovieRepository, MovieRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
