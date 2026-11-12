@@ -186,7 +186,13 @@ namespace CinemaSystemAPI.Controllers
                     s.StartTime,
                     s.EndTime,
                     s.BasePrice,
-                    s.IsActive
+                    s.IsActive,
+                    TotalSeats = _context.Seats.Count(seat => seat.RoomId == s.RoomId),
+                    AvailableSeats = _context.Seats.Count(seat => seat.RoomId == s.RoomId && seat.IsActive) -
+                                     _context.BookingSeats.Count(bs => bs.Booking.ShowtimeId == s.Id &&
+                                                                       (bs.Booking.Status == "Confirmed" ||
+                                                                        bs.Booking.Status == "Completed" ||
+                                                                        bs.Booking.PaymentStatus == "Paid"))
                 })
                 .ToListAsync();
 

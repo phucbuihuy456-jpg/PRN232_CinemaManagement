@@ -1,50 +1,439 @@
+@model CinemaWeb.Models.AdminCombosListViewModel
 @{
     ViewData["Title"] = "Quản lý Combo Bắp Nước";
     Layout = "_AdminLayout";
 }
 
-<div class="d-flex justify-content-between align-items-center mb-4">
+<!-- Top Header Bar -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
     <div>
-        <h3 class="fw-bold text-white mb-1"><i class="bi bi-cup-straw text-warning me-2"></i>Quản Lý Combo Bắp Nước</h3>
-        <p class="text-secondary mb-0">Các gói combo bắp nước phục vụ khách xem phim (Quyền: Admin)</p>
+        <h3 class="fw-bold text-white mb-1">
+            <i class="bi bi-cup-straw text-warning me-2"></i>Quản Lý Combo Bắp Nước
+        </h3>
+        <p class="text-secondary mb-0">Thiết lập các gói combo bắp nước, định giá và kiểm soát trạng thái phục vụ khách hàng (Quyền: Admin)</p>
     </div>
+    @if (User.IsInRole("Admin"))
+    {
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-warning text-dark fw-bold d-flex align-items-center shadow" id="btnOpenCreateCombo" data-bs-toggle="modal" data-bs-target="#comboModal">
+                <i class="bi bi-plus-circle-fill me-2"></i> Thêm Combo Mới
+            </button>
+        </div>
+    }
 </div>
 
-<div class="card admin-card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-list-stars me-2"></i>Danh Sách Combo</span>
-        <span class="badge bg-warning text-dark">Quyền: Admin</span>
+<!-- 3 Thống kê nhanh (KPI Summary) -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-4">
+        <div class="card admin-card p-3 h-100">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-secondary small text-uppercase fw-semibold">Tổng số gói combo</span>
+                    <h3 class="fw-bold text-white mb-0 mt-1">@Model.Combos.Count</h3>
+                </div>
+                <div class="rounded-3 bg-warning bg-opacity-10 text-warning p-3 fs-4">
+                    <i class="bi bi-box-seam"></i>
+                </div>
+            </div>
+        </div>
     </div>
-    <div class="card-body">
-        <div class="row g-3">
-            <div class="col-md-3">
-                <div class="p-3 bg-dark border border-secondary rounded-3 text-center">
-                    <img src="https://images.unsplash.com/photo-1585647347483-22b66260dfff?w=500" class="img-fluid rounded mb-2" style="height: 120px; object-fit: cover;" />
-                    <h6 class="text-white fw-bold mb-1">Combo Solo</h6>
-                    <div class="text-danger fw-bold">79,000 VNĐ</div>
+    <div class="col-sm-4">
+        <div class="card admin-card p-3 h-100">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-secondary small text-uppercase fw-semibold">Đang mở bán</span>
+                    <h3 class="fw-bold text-success mb-0 mt-1">@Model.Combos.Count(c => c.IsActive)</h3>
+                </div>
+                <div class="rounded-3 bg-success bg-opacity-10 text-success p-3 fs-4">
+                    <i class="bi bi-check2-circle"></i>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="p-3 bg-dark border border-secondary rounded-3 text-center">
-                    <img src="https://images.unsplash.com/photo-1572177191856-3cde618dee1f?w=500" class="img-fluid rounded mb-2" style="height: 120px; object-fit: cover;" />
-                    <h6 class="text-white fw-bold mb-1">Combo Couple</h6>
-                    <div class="text-danger fw-bold">109,000 VNĐ</div>
+        </div>
+    </div>
+    <div class="col-sm-4">
+        <div class="card admin-card p-3 h-100">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-secondary small text-uppercase fw-semibold">Đã ngưng bán</span>
+                    <h3 class="fw-bold text-secondary mb-0 mt-1">@Model.Combos.Count(c => !c.IsActive)</h3>
                 </div>
-            </div>
-            <div class="col-md-3">
-                <div class="p-3 bg-dark border border-secondary rounded-3 text-center">
-                    <img src="https://images.unsplash.com/photo-1505686994434-e3cc5abf1330?w=500" class="img-fluid rounded mb-2" style="height: 120px; object-fit: cover;" />
-                    <h6 class="text-white fw-bold mb-1">Combo Family</h6>
-                    <div class="text-danger fw-bold">189,000 VNĐ</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="p-3 bg-dark border border-secondary rounded-3 text-center">
-                    <img src="https://images.unsplash.com/photo-1512149673953-1e251807ec7c?w=500" class="img-fluid rounded mb-2" style="height: 120px; object-fit: cover;" />
-                    <h6 class="text-white fw-bold mb-1">Combo VIP</h6>
-                    <div class="text-danger fw-bold">139,000 VNĐ</div>
+                <div class="rounded-3 bg-secondary bg-opacity-10 text-secondary p-3 fs-4">
+                    <i class="bi bi-slash-circle"></i>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Bộ lọc tìm kiếm Combo (Filter Bar) -->
+<div class="card admin-card mb-4">
+    <div class="card-body py-3">
+        <form method="get" asp-controller="Admin" asp-action="Combos" class="row g-2 align-items-center">
+            <div class="col-md-9">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-dark text-secondary border-secondary">
+                        <i class="bi bi-search"></i>
+                    </span>
+                    <input type="text" 
+                           name="search" 
+                           class="form-control bg-dark text-white border-secondary" 
+                           value="@Model.SearchKeyword" 
+                           placeholder="Tìm kiếm tên gói combo hoặc mô tả món..." />
+                </div>
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-sm btn-warning text-dark fw-semibold flex-grow-1 d-flex align-items-center justify-content-center">
+                    <i class="bi bi-funnel-fill me-1"></i> Lọc
+                </button>
+                @if (!string.IsNullOrEmpty(Model.SearchKeyword))
+                {
+                    <a asp-action="Combos" class="btn btn-sm btn-outline-secondary" title="Xóa bộ lọc">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                }
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Danh Sách Combo Grid -->
+<div class="card admin-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-bold text-white">
+            <i class="bi bi-grid text-warning me-2"></i>Danh Sách Gói Combo (@Model.Combos.Count gói)
+        </span>
+        <span class="badge bg-warning text-dark">Dữ liệu CSDL thời gian thực</span>
+    </div>
+
+    <div class="card-body">
+        @if (Model.Combos != null && Model.Combos.Any())
+        {
+            <div class="row g-4">
+                @foreach (var c in Model.Combos)
+                {
+                    <div class="col-md-6 col-xl-3">
+                        <div class="card bg-black border border-secondary border-opacity-50 h-100 rounded-3 overflow-hidden shadow-sm hover-border-warning transition-all">
+                            <!-- Image Cover -->
+                            <div class="position-relative" style="height: 150px; overflow: hidden; background: #1a1a1a;">
+                                <img src="@(string.IsNullOrEmpty(c.ImageUrl) ? "https://images.unsplash.com/photo-1585647347483-22b66260dfff?w=500" : c.ImageUrl)" 
+                                     alt="@c.Name" 
+                                     class="w-100 h-100" 
+                                     style="object-fit: cover;" />
+                                <div class="position-absolute top-0 end-0 m-2">
+                                    @if (c.IsActive)
+                                    {
+                                        <span class="badge bg-success shadow-sm"><i class="bi bi-check-circle-fill me-1"></i>Đang bán</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary shadow-sm"><i class="bi bi-pause-circle-fill me-1"></i>Ngưng bán</span>
+                                    }
+                                </div>
+                            </div>
+
+                            <!-- Body Info -->
+                            <div class="card-body p-3 d-flex flex-column">
+                                <div class="d-flex justify-content-between align-items-start mb-1">
+                                    <h5 class="text-white fw-bold mb-0 text-truncate" title="@c.Name">@c.Name</h5>
+                                    <span class="badge bg-dark border border-secondary text-secondary font-monospace" style="font-size: 0.7rem;">#@c.Id</span>
+                                </div>
+
+                                <p class="text-secondary small flex-grow-1 mb-2" style="font-size: 0.8rem; min-height: 38px;">
+                                    @(string.IsNullOrEmpty(c.Description) ? "Chưa có mô tả chi tiết." : c.Description)
+                                </p>
+
+                                <div class="fs-5 fw-bold text-warning mb-3">
+                                    @c.Price.ToString("N0") <small class="fs-6">VNĐ</small>
+                                </div>
+
+                                <!-- Action Buttons -->
+                                <div class="d-flex gap-2 pt-2 border-top border-secondary border-opacity-50">
+                                    <button type="button" 
+                                            class="btn btn-sm btn-outline-warning flex-grow-1 btn-edit-combo" 
+                                            data-id="@c.Id" 
+                                            title="Sửa thông tin combo">
+                                        <i class="bi bi-pencil-square me-1"></i> Sửa
+                                    </button>
+                                    @if (c.IsActive)
+                                    {
+                                        <button type="button" 
+                                                class="btn btn-sm btn-outline-danger btn-delete-combo" 
+                                                data-id="@c.Id" 
+                                                data-name="@c.Name" 
+                                                title="Ngưng bán gói combo này">
+                                            <i class="bi bi-pause-circle"></i>
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-5">
+                <i class="bi bi-cup-straw fs-1 text-secondary d-block mb-3"></i>
+                <h5 class="text-white fw-bold mb-1">Chưa có gói combo nào</h5>
+                <p class="text-secondary small mb-3">Không tìm thấy combo nào phù hợp với bộ lọc tìm kiếm.</p>
+                <a asp-action="Combos" class="btn btn-sm btn-outline-warning rounded-pill px-3 text-dark fw-bold">
+                    <i class="bi bi-arrow-repeat me-1"></i> Tải lại danh sách
+                </a>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- MODAL: THÊM MỚI / CHỈNH SỬA COMBO (Admin)   -->
+<!-- ============================================ -->
+<div class="modal fade" id="comboModal" tabindex="-1" aria-labelledby="comboModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark border-secondary text-light">
+            <div class="modal-header border-secondary bg-black">
+                <h5 class="modal-title text-white fw-bold" id="comboModalLabel">
+                    <i class="bi bi-cup-straw text-warning me-2"></i>Thêm Combo Mới
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div id="modalComboAlert" class="alert alert-danger d-none py-2 px-3 small mb-3"></div>
+
+                <form id="comboForm">
+                    <input type="hidden" id="modalComboId" value="" />
+
+                    <!-- 1. Tên Combo -->
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-bold">TÊN GÓI COMBO <span class="text-danger">*</span></label>
+                        <input type="text" id="modalComboName" class="form-control bg-black text-white border-secondary" placeholder="Ví dụ: Combo Couple Bắp Nước" required />
+                    </div>
+
+                    <!-- 2. Giá Bán (VNĐ) -->
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-bold">GIÁ BÁN (VNĐ) <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="number" id="modalComboPrice" class="form-control bg-black text-white border-secondary" placeholder="Ví dụ: 109000" min="0" step="1000" required />
+                            <span class="input-group-text bg-dark text-secondary border-secondary">VNĐ</span>
+                        </div>
+                    </div>
+
+                    <!-- 3. Ảnh Minh Họa (URL) -->
+                    <div class="row g-2 mb-3 align-items-center">
+                        <div class="col-sm-9">
+                            <label class="form-label text-secondary small fw-bold">ĐƯỜNG DẪN ẢNH (IMAGE URL)</label>
+                            <input type="url" id="modalComboImage" class="form-control bg-black text-white border-secondary" placeholder="https://..." />
+                        </div>
+                        <div class="col-sm-3 text-center">
+                            <img id="comboImagePreview" src="https://images.unsplash.com/photo-1585647347483-22b66260dfff?w=500" class="rounded shadow-sm" style="width: 55px; height: 55px; object-fit: cover;" alt="Preview" />
+                        </div>
+                    </div>
+
+                    <!-- 4. Mô Tả Chi Tiết -->
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-bold">MÔ TẢ GÓI COMBO</label>
+                        <textarea id="modalComboDescription" class="form-control bg-black text-white border-secondary" rows="2" placeholder="Ví dụ: 1 Bắp ngọt lớn (64oz) + 2 Nước ngọt có ga (32oz)"></textarea>
+                    </div>
+
+                    <!-- 5. Trạng Thái Hoạt Động -->
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="modalComboIsActive" checked />
+                        <label class="form-check-label text-light small fw-bold" for="modalComboIsActive">Mở bán ngay lập tức</label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-secondary bg-black py-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Hủy bỏ</button>
+                <button type="button" class="btn btn-sm btn-warning text-dark px-4 fw-semibold" id="btnSubmitCombo">
+                    <i class="bi bi-check-circle-fill me-1"></i> <span id="btnSubmitComboText">Lưu Combo</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .hover-border-warning {
+        transition: all 0.25s ease-in-out;
+    }
+    .hover-border-warning:hover {
+        border-color: #ffc107 !important;
+        transform: translateY(-3px);
+        box-shadow: 0 8px 24px rgba(255, 193, 7, 0.2) !important;
+    }
+</style>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const comboModal = new bootstrap.Modal(document.getElementById('comboModal'));
+            const modalComboLabel = document.getElementById('comboModalLabel');
+            const modalComboAlert = document.getElementById('modalComboAlert');
+            const btnOpenCreateCombo = document.getElementById('btnOpenCreateCombo');
+            const btnSubmitCombo = document.getElementById('btnSubmitCombo');
+            const btnSubmitComboText = document.getElementById('btnSubmitComboText');
+
+            const modalComboId = document.getElementById('modalComboId');
+            const modalComboName = document.getElementById('modalComboName');
+            const modalComboPrice = document.getElementById('modalComboPrice');
+            const modalComboImage = document.getElementById('modalComboImage');
+            const comboImagePreview = document.getElementById('comboImagePreview');
+            const modalComboDescription = document.getElementById('modalComboDescription');
+            const modalComboIsActive = document.getElementById('modalComboIsActive');
+
+            modalComboImage?.addEventListener('input', function () {
+                const val = this.value.trim();
+                comboImagePreview.src = val ? val : 'https://images.unsplash.com/photo-1585647347483-22b66260dfff?w=500';
+            });
+
+            // 1. MỞ MODAL THÊM COMBO
+            btnOpenCreateCombo?.addEventListener('click', function () {
+                modalComboLabel.innerHTML = '<i class="bi bi-cup-straw text-warning me-2"></i>Thêm Combo Mới';
+                btnSubmitComboText.textContent = 'Lưu Combo';
+                modalComboAlert.classList.add('d-none');
+                modalComboAlert.textContent = '';
+
+                modalComboId.value = '';
+                modalComboName.value = '';
+                modalComboPrice.value = 89000;
+                modalComboImage.value = '';
+                comboImagePreview.src = 'https://images.unsplash.com/photo-1585647347483-22b66260dfff?w=500';
+                modalComboDescription.value = '';
+                modalComboIsActive.checked = true;
+            });
+
+            // 2. MỞ MODAL SỬA COMBO
+            document.querySelectorAll('.btn-edit-combo').forEach(btn => {
+                btn.addEventListener('click', async function () {
+                    const id = this.getAttribute('data-id');
+                    modalComboAlert.classList.add('d-none');
+                    modalComboAlert.textContent = '';
+
+                    modalComboLabel.innerHTML = `<i class="bi bi-pencil-square text-warning me-2"></i>Chỉnh Sửa Combo #${id}`;
+                    btnSubmitComboText.textContent = 'Lưu Thay Đổi';
+
+                    try {
+                        const res = await fetch(`/Admin/GetComboDetail?id=${id}`);
+                        if (!res.ok) {
+                            alert('Không thể tải thông tin combo!');
+                            return;
+                        }
+
+                        const data = await res.json();
+                        modalComboId.value = data.id;
+                        modalComboName.value = data.name || '';
+                        modalComboPrice.value = data.price || 0;
+                        modalComboImage.value = data.imageUrl || '';
+                        comboImagePreview.src = data.imageUrl ? data.imageUrl : 'https://images.unsplash.com/photo-1585647347483-22b66260dfff?w=500';
+                        modalComboDescription.value = data.description || '';
+                        modalComboIsActive.checked = data.isActive;
+
+                        comboModal.show();
+                    } catch (err) {
+                        console.error('Lỗi khi tải chi tiết combo:', err);
+                        alert('Đã xảy ra lỗi kết nối khi tải chi tiết combo.');
+                    }
+                });
+            });
+
+            // 3. SUBMIT LƯU COMBO (CREATE HOẶC UPDATE)
+            btnSubmitCombo?.addEventListener('click', async function () {
+                modalComboAlert.classList.add('d-none');
+                modalComboAlert.textContent = '';
+
+                const id = modalComboId.value ? parseInt(modalComboId.value, 10) : null;
+                const name = modalComboName.value.trim();
+                const price = parseFloat(modalComboPrice.value);
+
+                if (!name) {
+                    showError('Vui lòng nhập tên gói combo.');
+                    return;
+                }
+                if (isNaN(price) || price < 0) {
+                    showError('Giá combo không được âm.');
+                    return;
+                }
+
+                const payload = {
+                    name: name,
+                    price: price,
+                    imageUrl: modalComboImage.value.trim(),
+                    description: modalComboDescription.value.trim(),
+                    isActive: modalComboIsActive.checked
+                };
+
+                const isEdit = id && id > 0;
+                const url = isEdit ? `/Admin/UpdateCombo?id=${id}` : '/Admin/CreateCombo';
+
+                const origHtml = btnSubmitCombo.innerHTML;
+                btnSubmitCombo.disabled = true;
+                btnSubmitCombo.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Đang lưu...';
+
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        alert(isEdit ? 'Cập nhật combo thành công!' : 'Tạo combo mới thành công!');
+                        window.location.reload();
+                    } else {
+                        showError(data.message || 'Không thể lưu combo.');
+                        btnSubmitCombo.disabled = false;
+                        btnSubmitCombo.innerHTML = origHtml;
+                    }
+                } catch (err) {
+                    console.error('Lỗi khi lưu combo:', err);
+                    showError('Lỗi kết nối tới máy chủ khi lưu combo.');
+                    btnSubmitCombo.disabled = false;
+                    btnSubmitCombo.innerHTML = origHtml;
+                }
+            });
+
+            function showError(msg) {
+                modalComboAlert.textContent = msg;
+                modalComboAlert.classList.remove('d-none');
+            }
+
+            // 4. NGƯNG BÁN COMBO (DELETE)
+            document.querySelectorAll('.btn-delete-combo').forEach(btn => {
+                btn.addEventListener('click', async function () {
+                    const id = this.getAttribute('data-id');
+                    const name = this.getAttribute('data-name');
+
+                    if (!confirm(`Bạn có chắc muốn chuyển combo "${name}" sang trạng thái NGƯNG BÁN?`)) return;
+
+                    const origHtml = this.innerHTML;
+                    this.disabled = true;
+                    this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+                    try {
+                        const response = await fetch(`/Admin/DeleteCombo?id=${id}`, {
+                            method: 'POST'
+                        });
+
+                        const data = await response.json();
+
+                        if (response.ok) {
+                            alert(data.message || 'Chuyển trạng thái combo thành công!');
+                            window.location.reload();
+                        } else {
+                            alert(data.message || 'Không thể thao tác trên combo này.');
+                            this.disabled = false;
+                            this.innerHTML = origHtml;
+                        }
+                    } catch (err) {
+                        console.error('Lỗi khi xóa combo:', err);
+                        alert('Đã xảy ra lỗi kết nối tới máy chủ.');
+                        this.disabled = false;
+                        this.innerHTML = origHtml;
+                    }
+                });
+            });
+        });
+    </script>
+}
