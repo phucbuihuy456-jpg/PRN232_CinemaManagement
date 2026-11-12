@@ -270,6 +270,10 @@ namespace CinemaSystemAPI.Controllers
             {
                 userId = request.UserId.Value;
             }
+            else if (int.TryParse(Request.Headers["X-User-Id"].FirstOrDefault(), out int headerUserId) && await _context.Users.AnyAsync(u => u.Id == headerUserId))
+            {
+                userId = headerUserId;
+            }
 
             // 6. THỰC HIỆN DATABASE TRANSACTION ĐẢM BẢO TÍNH TOÀN VẸN (ACID)
             await using var transaction = await _context.Database.BeginTransactionAsync();

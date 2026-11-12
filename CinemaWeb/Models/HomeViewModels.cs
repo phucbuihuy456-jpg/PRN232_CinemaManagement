@@ -13,6 +13,20 @@ namespace CinemaWeb.Models
         public GenreViewModel? Genre { get; set; }
     }
 
+    public class MovieShowtimeViewModel
+    {
+        public int Id { get; set; }
+        public int MovieId { get; set; }
+        public string MovieTitle { get; set; } = string.Empty;
+        public int RoomId { get; set; }
+        public string RoomName { get; set; } = string.Empty;
+        public string ScreenType { get; set; } = string.Empty;
+        public DateTime StartTime { get; set; }
+        public DateTime EndTime { get; set; }
+        public decimal BasePrice { get; set; }
+        public bool IsActive { get; set; }
+    }
+
     public class MovieItemViewModel
     {
         public int Id { get; set; }
@@ -29,6 +43,7 @@ namespace CinemaWeb.Models
         public string? Language { get; set; }
         public List<MovieGenreItemViewModel> MovieGenres { get; set; } = new();
         public List<string> Genres { get; set; } = new();
+        public List<MovieShowtimeViewModel> Showtimes { get; set; } = new();
 
         public string GenreDisplay
         {

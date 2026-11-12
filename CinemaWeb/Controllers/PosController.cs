@@ -1,10 +1,12 @@
 using System.Text;
 using System.Text.Json;
 using CinemaWeb.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CinemaWeb.Controllers
 {
+    [Authorize(Roles = "Staff,Admin")]
     public class PosController : Controller
     {
         private readonly IHttpClientFactory _httpClientFactory;
@@ -140,7 +142,8 @@ namespace CinemaWeb.Controllers
 
                 if (!holdRes.IsSuccessStatusCode)
                 {
-                    return StatusCode((int)holdRes.StatusCode, Content(holdJsonStr, "application/json"));
+                    Response.StatusCode = (int)holdRes.StatusCode;
+                    return Content(holdJsonStr, "application/json");
                 }
 
                 var holdData = JsonSerializer.Deserialize<JsonElement>(holdJsonStr);
@@ -171,7 +174,8 @@ namespace CinemaWeb.Controllers
 
                 if (!checkoutRes.IsSuccessStatusCode)
                 {
-                    return StatusCode((int)checkoutRes.StatusCode, Content(checkoutJsonStr, "application/json"));
+                    Response.StatusCode = (int)checkoutRes.StatusCode;
+                    return Content(checkoutJsonStr, "application/json");
                 }
 
                 // Bổ sung thông tin tính tiền thừa (Change) cho Staff

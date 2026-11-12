@@ -8,6 +8,7 @@ namespace CinemaWeb.Services
         Task<List<GenreViewModel>> GetGenresAsync();
         Task<List<MovieItemViewModel>> GetMoviesFromODataAsync(int? genreId = null);
         Task<MovieItemViewModel?> GetMovieByIdAsync(int id);
+        Task<List<MovieShowtimeViewModel>> GetShowtimesByMovieIdAsync(int movieId);
     }
 
     public class MovieApiClient : IMovieApiClient
@@ -120,6 +121,32 @@ namespace CinemaWeb.Services
             }
 
             return new List<MovieItemViewModel>();
+        }
+
+        public async Task<List<MovieShowtimeViewModel>> GetShowtimesByMovieIdAsync(int movieId)
+        {
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                var response = await client.GetAsync($"{_apiBaseUrl}/api/showtimes?movieId={movieId}");
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadAsStringAsync();
+                    var showtimes = JsonSerializer.Deserialize<List<MovieShowtimeViewModel>>(json, _jsonOptions);
+                    return showtimes ?? new List<MovieShowtimeViewModel>();
+                }
+                else
+                {
+                    _logger.LogWarning("Không thể tải suất chiếu cho phim ID {MovieId}. Status: {StatusCode}", movieId, response.StatusCode);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi gọi API lấy danh sách suất chiếu cho phim {MovieId}", movieId);
+            }
+
+            return new List<MovieShowtimeViewModel>();
         }
     }
 }

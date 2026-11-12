@@ -96,6 +96,9 @@ namespace CinemaWeb.Controllers
                 return NotFound();
             }
 
+            // Tải danh sách suất chiếu của phim này
+            movie.Showtimes = await _movieApiClient.GetShowtimesByMovieIdAsync(id);
+
             return View(movie);
         }
     }

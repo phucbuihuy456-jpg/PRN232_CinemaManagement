@@ -179,6 +179,7 @@ namespace CinemaSystemAPI.Controllers
                     s.Id,
                     s.MovieId,
                     MovieTitle = s.Movie.Title,
+                    PosterUrl = s.Movie.PosterUrl,
                     s.RoomId,
                     RoomName = s.Room.Name,
                     ScreenType = s.Room.ScreenType,
@@ -228,9 +229,32 @@ namespace CinemaSystemAPI.Controllers
             }
             return Ok(showtime);
         }
+        /// <summary>
+        /// Lấy danh sách các phòng chiếu đang hoạt động để Admin chọn khi tạo suất chiếu.
+        /// </summary>
+        [HttpGet("/api/rooms")]
+        [HttpGet("rooms")]
+        public async Task<IActionResult> GetRooms()
+        {
+            var rooms = await _context.Rooms
+                .AsNoTracking()
+                .Where(r => r.IsActive)
+                .OrderBy(r => r.Id)
+                .Select(r => new
+                {
+                    r.Id,
+                    r.Name,
+                    r.ScreenType,
+                    r.TotalSeats
+                })
+                .ToListAsync();
+
+            return Ok(rooms);
+        }
+
         [Authorize(Roles = "Admin")]
         [HttpPost]
-        public async Task<ActionResult<Showtime>> CreateShowtime(CreateShowTimeDto showTime)
+        public async Task<ActionResult> CreateShowtime(CreateShowTimeDto showTime)
         {
             // 1. Kiểm tra thời gian bắt đầu
             if (showTime.StartTime <= DateTime.Now)
@@ -268,9 +292,16 @@ namespace CinemaSystemAPI.Controllers
 
             // 6. Kiểm tra ngày chiếu trong khoảng phát hành của phim
             var showDate = DateOnly.FromDateTime(showTime.StartTime);
-            if (showDate < checkMovie.ReleaseDate || showDate > checkMovie.EndDate)
+            if (showDate < checkMovie.ReleaseDate)
             {
-                return BadRequest(new { message = $"Ngày chiếu không nằm trong khoảng phát hành của phim ({checkMovie.ReleaseDate} - {checkMovie.EndDate})." });
+                return BadRequest(new { message = $"Ngày chiếu ({showDate:dd/MM/yyyy}) không được trước ngày khởi chiếu của phim ({checkMovie.ReleaseDate:dd/MM/yyyy})." });
+            }
+
+            // Nếu phim có EndDate trong tương lai thì kiểm tra không được quá EndDate
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            if (checkMovie.EndDate >= today && showDate > checkMovie.EndDate)
+            {
+                return BadRequest(new { message = $"Ngày chiếu ({showDate:dd/MM/yyyy}) vượt quá ngày ngừng chiếu của phim ({checkMovie.EndDate:dd/MM/yyyy})." });
             }
 
             // 7. Kiểm tra phòng chiếu
@@ -310,7 +341,16 @@ namespace CinemaSystemAPI.Controllers
             _context.Showtimes.Add(newShowtime);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetShowtimeById), new { id = newShowtime.Id }, newShowtime);
+            return CreatedAtAction(nameof(GetShowtimeById), new { id = newShowtime.Id }, new
+            {
+                id = newShowtime.Id,
+                movieId = newShowtime.MovieId,
+                roomId = newShowtime.RoomId,
+                startTime = newShowtime.StartTime,
+                endTime = newShowtime.EndTime,
+                basePrice = newShowtime.BasePrice,
+                message = "Tạo suất chiếu mới thành công!"
+            });
         }
         [Authorize(Roles = "Admin")]
         [HttpPut("{id:int}")]
@@ -380,9 +420,16 @@ namespace CinemaSystemAPI.Controllers
 
             // 7. Kiểm tra ngày chiếu trong khoảng phát hành của phim
             var showDate = DateOnly.FromDateTime(showTime.StartTime);
-            if (showDate < checkMovie.ReleaseDate || showDate > checkMovie.EndDate)
+            if (showDate < checkMovie.ReleaseDate)
             {
-                return BadRequest(new { message = $"Ngày chiếu không nằm trong khoảng phát hành của phim ({checkMovie.ReleaseDate} - {checkMovie.EndDate})." });
+                return BadRequest(new { message = $"Ngày chiếu ({showDate:dd/MM/yyyy}) không được trước ngày khởi chiếu của phim ({checkMovie.ReleaseDate:dd/MM/yyyy})." });
+            }
+
+            // Nếu phim có EndDate trong tương lai thì kiểm tra không được quá EndDate
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            if (checkMovie.EndDate >= today && showDate > checkMovie.EndDate)
+            {
+                return BadRequest(new { message = $"Ngày chiếu ({showDate:dd/MM/yyyy}) vượt quá ngày ngừng chiếu của phim ({checkMovie.EndDate:dd/MM/yyyy})." });
             }
 
             // 8. Kiểm tra phòng chiếu
@@ -421,25 +468,31 @@ namespace CinemaSystemAPI.Controllers
         }
         [Authorize(Roles = "Admin")]
         [HttpDelete("{id:int}")]
-        public async Task<ActionResult<Showtime>> DeleteShowTime(int id)
+        public async Task<IActionResult> DeleteShowTime(int id)
         {
             var checkShowTime = await _context.Showtimes
                 .Include(s => s.SeatHolds)
                 .FirstOrDefaultAsync(s => s.Id == id && s.IsActive == true);
+
             if (checkShowTime == null)
             {
-                return NotFound(new { message = "Không tìm thấy showtime" });
+                return NotFound(new { message = $"Không tìm thấy suất chiếu với ID = {id}" });
             }
-            if (checkShowTime.StartTime <= DateTime.Now)
+
+            // Chỉ chặn xóa nếu suất chiếu ĐANG diễn ra (StartTime <= NOW và EndTime > NOW)
+            if (checkShowTime.StartTime <= DateTime.Now && checkShowTime.EndTime > DateTime.Now)
             {
-                return BadRequest(new { message = "Không thể xóa suất chiếu đã/đang diễn ra" });
+                return BadRequest(new { message = "Không thể xóa suất chiếu đang được trình chiếu trong phòng chiếu!" });
             }
+
+            // Kiểm tra vé đã bán (nếu có khách mua vé thành công thì không được xóa)
             bool hasTicketsSold = await _context.BookingSeats.AnyAsync(bs =>
-        bs.Booking.ShowtimeId == id &&
-        (bs.Booking.Status == "Confirmed" ||
-         bs.Booking.Status == "Completed" ||
-         bs.Booking.PaymentStatus == "Paid")
-    );
+                bs.Booking.ShowtimeId == id &&
+                (bs.Booking.Status == "Confirmed" ||
+                 bs.Booking.Status == "Completed" ||
+                 bs.Booking.PaymentStatus == "Paid")
+            );
+
             if (hasTicketsSold)
             {
                 return BadRequest(new
@@ -447,14 +500,17 @@ namespace CinemaSystemAPI.Controllers
                     message = "Suất chiếu này đã có khách hàng mua vé, không thể xóa! Vui lòng xử lý hủy vé/hoàn tiền trước."
                 });
             }
-            // 4. Dọn dẹp các ghế đang được giữ tạm (nếu có ai đang chọn ghế dở dang)
+
+            // Dọn dẹp các ghế đang được giữ tạm nếu có
             if (checkShowTime.SeatHolds != null && checkShowTime.SeatHolds.Any())
             {
                 _context.SeatHolds.RemoveRange(checkShowTime.SeatHolds);
             }
-            // 5. Thực hiện xóa mềm (Soft Delete)
+
+            // Thực hiện xóa mềm (Soft Delete)
             checkShowTime.IsActive = false;
             await _context.SaveChangesAsync();
+
             return Ok(new { message = "Xóa suất chiếu thành công!" });
         }
     }

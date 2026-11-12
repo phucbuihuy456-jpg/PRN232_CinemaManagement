@@ -103,9 +103,12 @@
 
                 <!-- Nút hành động đặt vé -->
                 <div class="d-flex flex-wrap gap-3">
-                    <a asp-controller="Booking" asp-action="SeatMap" asp-route-id="@Model.Id" class="btn btn-danger btn-lg px-4 py-3 fw-bold rounded-3 shadow">
-                        <i class="bi bi-ticket-perforated-fill me-2"></i> Mua Vé Ngay
+                    @if (!string.IsNullOrEmpty(embedTrailerUrl))
+                    {
+                        <a href="#trailerSection" class="btn btn-outline-light btn-lg px-4 py-3 fw-semibold rounded-3">
+                            <i class="bi bi-play-circle me-2"></i> Xem Trailer
                         </a>
+                    }
                 </div>
             </div>
         </div>
@@ -114,6 +117,108 @@
 
 <!-- NỘI DUNG TÓM TẮT & TRAILER -->
 <div class="container py-5">
+    <!-- KHỐI CHỌN SUẤT CHIẾU THEO THỜI GIAN CỦA KHÁCH HÀNG (CÁCH B) -->
+    <div id="showtimes-section" class="mb-5 p-4 rounded-4 bg-dark border border-secondary border-opacity-25 shadow-lg">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3 border-bottom border-secondary border-opacity-50">
+            <div>
+                <h3 class="text-white fw-bold mb-1">
+                    <i class="bi bi-calendar2-range-fill text-danger me-2"></i> Lịch Chiếu & Đặt Vé
+                </h3>
+                <p class="text-secondary small mb-0">Vui lòng chọn khung giờ chiếu phù hợp để tiến hành chọn ghế ngồi trong rạp</p>
+            </div>
+            <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-3 py-2 rounded-pill font-monospace">
+                <i class="bi bi-film me-1"></i> @Model.Title
+            </span>
+        </div>
+
+        @if (Model.Showtimes != null && Model.Showtimes.Any())
+        {
+            var showtimesByDate = Model.Showtimes
+                .OrderBy(s => s.StartTime)
+                .GroupBy(s => s.StartTime.Date)
+                .ToList();
+
+            <!-- TAB NGÀY CHIẾU -->
+            <ul class="nav nav-pills gap-2 mb-4" id="showtimeDateTabs" role="tablist">
+                @for (int i = 0; i < showtimesByDate.Count; i++)
+                {
+                    var group = showtimesByDate[i];
+                    var date = group.Key;
+                    var dateTitle = date == DateTime.Today ? "Hôm nay" : 
+                                    date == DateTime.Today.AddDays(1) ? "Ngày mai" : 
+                                    date.ToString("dddd", new System.Globalization.CultureInfo("vi-VN"));
+                    var tabId = $"date-tab-{date:yyyyMMdd}";
+                    var paneId = $"pane-{date:yyyyMMdd}";
+
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(i == 0 ? "active" : "") rounded-3 px-3 py-2 text-start" 
+                                id="@tabId" 
+                                data-bs-toggle="pill" 
+                                data-bs-target="#@paneId" 
+                                type="button" 
+                                role="tab">
+                            <span class="d-block small text-uppercase text-secondary fw-semibold">@dateTitle</span>
+                            <strong class="fs-6">@date.ToString("dd/MM/yyyy")</strong>
+                        </button>
+                    </li>
+                }
+            </ul>
+
+            <!-- DANH SÁCH SUẤT CHIẾU THEO NGÀY -->
+            <div class="tab-content" id="showtimeTabContent">
+                @for (int i = 0; i < showtimesByDate.Count; i++)
+                {
+                    var group = showtimesByDate[i];
+                    var date = group.Key;
+                    var paneId = $"pane-{date:yyyyMMdd}";
+
+                    <div class="tab-pane fade @(i == 0 ? "show active" : "")" id="@paneId" role="tabpanel">
+                        <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-3">
+                            @foreach (var st in group.OrderBy(s => s.StartTime))
+                            {
+                                <div class="col">
+                                    <a asp-controller="Booking" asp-action="SeatMap" asp-route-id="@st.Id" 
+                                       class="card bg-black border border-secondary border-opacity-50 text-decoration-none h-100 p-3 text-center rounded-3 shadow-sm showtime-button-card">
+                                        <div class="fw-bold fs-4 text-white">
+                                            @st.StartTime.ToString("HH:mm")
+                                        </div>
+                                        <div class="text-secondary small mb-2">
+                                            ~ @st.EndTime.ToString("HH:mm")
+                                        </div>
+                                        <div class="badge bg-dark border border-secondary text-info mb-2 text-truncate" title="@st.RoomName (@st.ScreenType)">
+                                            <i class="bi bi-door-open me-1"></i>@st.RoomName
+                                            @if (!string.IsNullOrEmpty(st.ScreenType))
+                                            {
+                                                <span>(@st.ScreenType)</span>
+                                            }
+                                        </div>
+                                        <div class="text-warning fw-bold small mb-2">
+                                            @st.BasePrice.ToString("N0") đ
+                                        </div>
+                                        <div class="btn btn-sm btn-outline-danger w-100 py-1 fw-semibold">
+                                            <i class="bi bi-grid-3x3-gap me-1"></i> Chọn Ghế
+                                        </div>
+                                    </a>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-5">
+                <i class="bi bi-calendar-x fs-1 text-secondary d-block mb-3"></i>
+                <h5 class="text-white fw-bold mb-2">Chưa có lịch chiếu khả dụng</h5>
+                <p class="text-secondary small mb-4">Hiện tại bộ phim này chưa có lịch chiếu nào được mở bán trên hệ thống. Quý khách vui lòng quay lại sau.</p>
+                <a asp-controller="Home" asp-action="Index" class="btn btn-sm btn-outline-light rounded-pill px-4">
+                    <i class="bi bi-arrow-left me-1"></i> Khám phá các phim khác
+                </a>
+            </div>
+        }
+    </div>
+
     <div class="row g-5">
         <!-- Tóm tắt nội dung -->
         <div class="col-lg-8">
@@ -164,3 +269,35 @@
         </div>
     </div>
 </div>
+
+<style>
+    .showtime-button-card {
+        transition: all 0.25s ease-in-out;
+        border-color: rgba(255, 255, 255, 0.15) !important;
+        cursor: pointer;
+    }
+    .showtime-button-card:hover {
+        border-color: #dc3545 !important;
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(220, 53, 69, 0.3) !important;
+        background: rgba(220, 53, 69, 0.1) !important;
+    }
+    .showtime-button-card:hover .btn-outline-danger {
+        background-color: #dc3545;
+        color: #ffffff;
+    }
+    #showtimeDateTabs .nav-link {
+        background-color: rgba(255, 255, 255, 0.05);
+        color: #e0e0e0;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        transition: all 0.2s ease;
+    }
+    #showtimeDateTabs .nav-link.active {
+        background-color: #dc3545;
+        color: #ffffff;
+        border-color: #dc3545;
+    }
+    #showtimeDateTabs .nav-link.active .text-secondary {
+        color: rgba(255, 255, 255, 0.8) !important;
+    }
+</style>
