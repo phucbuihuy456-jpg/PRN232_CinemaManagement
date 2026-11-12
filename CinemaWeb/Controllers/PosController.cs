@@ -1,10 +1,13 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using CinemaWeb.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CinemaWeb.Controllers
 {
+    [Authorize(Roles = "Staff,Admin")]
     public class PosController : Controller
     {
         private readonly IHttpClientFactory _httpClientFactory;
@@ -24,18 +27,25 @@ namespace CinemaWeb.Controllers
 
         /// <summary>
         /// Task 31: Màn hình Staff POS Bán vé nhanh tại quầy.
-        /// GET: /Pos
+        /// GET: /Pos?date=yyyy-MM-dd
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index([FromQuery] string? date)
         {
             var client = _httpClientFactory.CreateClient();
             var model = new PosViewModel();
 
-            // 1. Tải danh sách suất chiếu từ API
+            DateTime selectedDate = DateTime.Today;
+            if (!string.IsNullOrWhiteSpace(date) && DateTime.TryParse(date, out var parsedDate))
+            {
+                selectedDate = parsedDate.Date;
+            }
+            model.SelectedDate = selectedDate.ToString("yyyy-MM-dd");
+
+            // 1. Tải danh sách suất chiếu từ API theo ngày đã chọn
             try
             {
-                var showtimesRes = await client.GetAsync($"{_apiBaseUrl}/api/showtimes");
+                var showtimesRes = await client.GetAsync($"{_apiBaseUrl}/api/showtimes?date={selectedDate:yyyy-MM-dd}");
                 if (showtimesRes.IsSuccessStatusCode)
                 {
                     var content = await showtimesRes.Content.ReadAsStringAsync();
@@ -48,13 +58,13 @@ namespace CinemaWeb.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Lỗi kết nối khi tải suất chiếu cho POS.");
+                _logger.LogWarning(ex, "Lỗi kết nối khi tải suất chiếu cho POS ngày {Date}.", selectedDate);
             }
 
             // Fallback suất chiếu nếu API chưa có hoặc lỗi
             if (!model.Showtimes.Any())
             {
-                model.Showtimes = CreateFallbackShowtimes();
+                model.Showtimes = CreateFallbackShowtimes(selectedDate);
             }
 
             // 2. Tải danh sách Combo bắp nước từ API
@@ -140,7 +150,8 @@ namespace CinemaWeb.Controllers
 
                 if (!holdRes.IsSuccessStatusCode)
                 {
-                    return StatusCode((int)holdRes.StatusCode, Content(holdJsonStr, "application/json"));
+                    Response.StatusCode = (int)holdRes.StatusCode;
+                    return Content(holdJsonStr, "application/json");
                 }
 
                 var holdData = JsonSerializer.Deserialize<JsonElement>(holdJsonStr);
@@ -171,34 +182,36 @@ namespace CinemaWeb.Controllers
 
                 if (!checkoutRes.IsSuccessStatusCode)
                 {
-                    return StatusCode((int)checkoutRes.StatusCode, Content(checkoutJsonStr, "application/json"));
+                    Response.StatusCode = (int)checkoutRes.StatusCode;
+                    return Content(checkoutJsonStr, "application/json");
                 }
 
-                // Bổ sung thông tin tính tiền thừa (Change) cho Staff
-                using var doc = JsonDocument.Parse(checkoutJsonStr);
-                var root = doc.RootElement;
-                decimal totalAmount = root.GetProperty("totalAmount").GetDecimal();
-                decimal cashReceived = request.CashReceived >= totalAmount ? request.CashReceived : totalAmount;
-                decimal changeAmount = cashReceived - totalAmount;
-
-                var resultObj = new
+                // Bổ sung thông tin tính tiền thừa (Change) cho Staff một cách an toàn bằng JsonNode
+                var jsonNode = JsonNode.Parse(checkoutJsonStr);
+                if (jsonNode is JsonObject obj)
                 {
-                    success = true,
-                    bookingId = root.GetProperty("bookingId").GetInt32(),
-                    qrCodeToken = root.GetProperty("qrCodeToken").GetString(),
-                    totalAmount = totalAmount,
-                    cashReceived = cashReceived,
-                    changeAmount = changeAmount,
-                    paymentMethod = root.GetProperty("paymentMethod").GetString(),
-                    createdAt = root.GetProperty("createdAt").GetString(),
-                    showtime = root.GetProperty("showtime"),
-                    seats = root.GetProperty("seats"),
-                    combos = root.GetProperty("combos"),
-                    customer = root.GetProperty("customer"),
-                    message = "Thanh toán thành công! Vé và hóa đơn đã được tạo."
-                };
+                    decimal totalAmount = 0;
+                    if (obj.TryGetPropertyValue("totalAmount", out var totalNode) && totalNode != null)
+                    {
+                        totalAmount = totalNode.GetValue<decimal>();
+                    }
+                    else if (obj.TryGetPropertyValue("TotalAmount", out var totalPascalNode) && totalPascalNode != null)
+                    {
+                        totalAmount = totalPascalNode.GetValue<decimal>();
+                    }
 
-                return Ok(resultObj);
+                    decimal cashReceived = request.CashReceived >= totalAmount ? request.CashReceived : totalAmount;
+                    decimal changeAmount = cashReceived - totalAmount;
+
+                    obj["success"] = true;
+                    obj["cashReceived"] = cashReceived;
+                    obj["changeAmount"] = changeAmount;
+                    obj["message"] = "Thanh toán thành công! Vé và hóa đơn đã được tạo.";
+
+                    return Content(obj.ToJsonString(), "application/json");
+                }
+
+                return Content(checkoutJsonStr, "application/json");
             }
             catch (Exception ex)
             {
@@ -264,9 +277,9 @@ namespace CinemaWeb.Controllers
             }
         }
 
-        private static List<PosShowtimeItem> CreateFallbackShowtimes()
+        private static List<PosShowtimeItem> CreateFallbackShowtimes(DateTime? baseDate = null)
         {
-            var today = DateTime.Today;
+            var today = (baseDate ?? DateTime.Today).Date;
             return new List<PosShowtimeItem>
             {
                 new()

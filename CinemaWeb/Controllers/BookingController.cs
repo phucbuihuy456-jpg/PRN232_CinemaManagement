@@ -1,6 +1,10 @@
+using System.Net.Http.Headers;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using CinemaWeb.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using QRCoder;
 
@@ -28,7 +32,7 @@ namespace CinemaWeb.Controllers
         /// GET: /Booking/SeatMap/{id?}
         /// </summary>
         [HttpGet]
-        // Chỗ cần fix (1)
+        // Đã fix: Nhận showtimeId trực tiếp từ màn hình chọn lịch chiếu
         public async Task<IActionResult> SeatMap(int? id)
         {
             int showtimeId = id ?? 1;
@@ -97,13 +101,46 @@ namespace CinemaWeb.Controllers
         public async Task<IActionResult> HoldSeats([FromBody] JsonElement payload)
         {
             var client = _httpClientFactory.CreateClient();
+
+            // Đính kèm JWT Token và UserId nếu khách hàng đã đăng nhập
+            var token = User.FindFirst("JwtToken")?.Value;
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            int? loggedInUserId = int.TryParse(userIdStr, out int id) ? id : null;
+
+            string finalJson = payload.ToString();
+            if (loggedInUserId.HasValue)
+            {
+                try
+                {
+                    var jsonNode = JsonNode.Parse(payload.ToString());
+                    if (jsonNode is JsonObject jsonObj)
+                    {
+                        if (!jsonObj.ContainsKey("userId") || jsonObj["userId"] == null)
+                        {
+                            jsonObj["userId"] = loggedInUserId.Value;
+                        }
+                        finalJson = jsonObj.ToJsonString();
+                    }
+                }
+                catch
+                {
+                    // Giữ nguyên payload gốc nếu parse lỗi
+                }
+            }
+
             try
             {
-                var content = new StringContent(payload.ToString(), Encoding.UTF8, "application/json");
+                var content = new StringContent(finalJson, Encoding.UTF8, "application/json");
                 var response = await client.PostAsync($"{_apiBaseUrl}/api/bookings/hold-seats", content);
                 var responseContent = await response.Content.ReadAsStringAsync();
 
-                return StatusCode((int)response.StatusCode, Content(responseContent, "application/json"));
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(responseContent, "application/json");
             }
             catch (Exception ex)
             {
@@ -207,6 +244,14 @@ namespace CinemaWeb.Controllers
                 model.AvailableCombos = CreateFallbackCombos();
             }
 
+            // Tự động điền thông tin khách hàng nếu đã đăng nhập
+            if (User.Identity?.IsAuthenticated == true)
+            {
+                model.CustomerName = User.FindFirst(ClaimTypes.Name)?.Value ?? User.Identity.Name;
+                model.CustomerEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+                model.CustomerPhone = User.FindFirst(ClaimTypes.MobilePhone)?.Value;
+            }
+
             return View(model);
         }
 
@@ -218,13 +263,47 @@ namespace CinemaWeb.Controllers
         public async Task<IActionResult> ProcessCheckout([FromBody] JsonElement payload)
         {
             var client = _httpClientFactory.CreateClient();
+
+            // 1. Đính kèm JWT Token của khách hàng từ Cookie Claims (nếu đã đăng nhập)
+            var token = User.FindFirst("JwtToken")?.Value;
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            // 2. Lấy UserId của khách hàng đang đăng nhập và tiêm vào payload để gán chủ sở hữu vé
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            int? loggedInUserId = int.TryParse(userIdStr, out int id) ? id : null;
+
+            string finalJson = payload.ToString();
+            if (loggedInUserId.HasValue)
+            {
+                try
+                {
+                    var jsonNode = JsonNode.Parse(payload.ToString());
+                    if (jsonNode is JsonObject jsonObj)
+                    {
+                        if (!jsonObj.ContainsKey("userId") || jsonObj["userId"] == null)
+                        {
+                            jsonObj["userId"] = loggedInUserId.Value;
+                        }
+                        finalJson = jsonObj.ToJsonString();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Lỗi khi chèn userId vào checkout payload");
+                }
+            }
+
             try
             {
-                var content = new StringContent(payload.ToString(), Encoding.UTF8, "application/json");
+                var content = new StringContent(finalJson, Encoding.UTF8, "application/json");
                 var response = await client.PostAsync($"{_apiBaseUrl}/api/bookings/checkout", content);
                 var responseContent = await response.Content.ReadAsStringAsync();
 
-                return StatusCode((int)response.StatusCode, Content(responseContent, "application/json"));
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(responseContent, "application/json");
             }
             catch (Exception ex)
             {
@@ -237,12 +316,19 @@ namespace CinemaWeb.Controllers
         /// Trang xem danh sách vé điện tử đã đặt của khách hàng.
         /// GET: /Booking/MyTickets
         /// </summary>
+        [Authorize]
         [HttpGet]
         public async Task<IActionResult> MyTickets()
         {
             var client = _httpClientFactory.CreateClient();
-            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var token = User.FindFirst("JwtToken")?.Value;
+
             var request = new HttpRequestMessage(HttpMethod.Get, $"{_apiBaseUrl}/api/bookings/my-history");
+            if (!string.IsNullOrEmpty(token))
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
             if (!string.IsNullOrEmpty(userId))
             {
                 request.Headers.Add("X-User-Id", userId);

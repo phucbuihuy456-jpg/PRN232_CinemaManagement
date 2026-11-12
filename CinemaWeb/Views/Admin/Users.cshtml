@@ -1,56 +1,423 @@
+@model CinemaWeb.Models.AdminUsersListViewModel
 @{
     ViewData["Title"] = "Quản lý Người dùng & Phân quyền";
     Layout = "_AdminLayout";
 }
 
-<div class="d-flex justify-content-between align-items-center mb-4">
+<!-- Top Header Bar -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
     <div>
-        <h3 class="fw-bold text-white mb-1"><i class="bi bi-people text-success me-2"></i>Quản Lý Người Dùng & Phân Quyền</h3>
-        <p class="text-secondary mb-0">Chỉ tài khoản Quản Trị Viên (Admin) mới có quyền truy cập trang này</p>
+        <h3 class="fw-bold text-white mb-1">
+            <i class="bi bi-people-fill text-success me-2"></i>Quản Lý Người Dùng & Phân Quyền
+        </h3>
+        <p class="text-secondary mb-0">Quản lý danh sách tài khoản, phân cấp vai trò (Admin / Staff / Customer) và kiểm soát trạng thái hoạt động</p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-danger px-3 py-2 fs-6">
+            <i class="bi bi-shield-lock-fill me-1"></i> Quyền: Admin Duy Nhất
+        </span>
     </div>
 </div>
 
+<!-- Bộ lọc tìm kiếm người dùng (Filter Bar) -->
+<div class="card admin-card mb-4">
+    <div class="card-body py-3">
+        <form method="get" asp-controller="Admin" asp-action="Users" class="row g-2 align-items-center">
+            <!-- Tìm theo từ khóa -->
+            <div class="col-md-4">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-dark text-secondary border-secondary">
+                        <i class="bi bi-search"></i>
+                    </span>
+                    <input type="text" 
+                           name="search" 
+                           class="form-control bg-dark text-white border-secondary" 
+                           value="@Model.SearchKeyword" 
+                           placeholder="Tìm theo Tên hoặc Email..." />
+                </div>
+            </div>
+
+            <!-- Lọc theo Vai trò -->
+            <div class="col-md-3">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-dark text-secondary border-secondary">
+                        <i class="bi bi-person-badge"></i>
+                    </span>
+                    <select name="role" class="form-select bg-dark text-white border-secondary">
+                        <option value="">-- Tất cả vai trò --</option>
+                        <option value="Admin" selected="@(Model.SelectedRole == "Admin")">Admin (Quản trị viên)</option>
+                        <option value="Staff" selected="@(Model.SelectedRole == "Staff")">Staff (Nhân viên)</option>
+                        <option value="Customer" selected="@(Model.SelectedRole == "Customer")">Customer (Khách hàng)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Lọc theo Trạng thái -->
+            <div class="col-md-3">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-dark text-secondary border-secondary">
+                        <i class="bi bi-toggle-on"></i>
+                    </span>
+                    <select name="isActive" class="form-select bg-dark text-white border-secondary">
+                        <option value="">-- Tất cả trạng thái --</option>
+                        <option value="true" selected="@(Model.SelectedIsActive == true)">Đang hoạt động</option>
+                        <option value="false" selected="@(Model.SelectedIsActive == false)">Đã bị khóa</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Nút bấm -->
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-sm btn-success flex-grow-1 d-flex align-items-center justify-content-center">
+                    <i class="bi bi-funnel-fill me-1"></i> Lọc
+                </button>
+                @if (!string.IsNullOrEmpty(Model.SearchKeyword) || !string.IsNullOrEmpty(Model.SelectedRole) || Model.SelectedIsActive.HasValue)
+                {
+                    <a asp-action="Users" class="btn btn-sm btn-outline-secondary" title="Xóa bộ lọc">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                }
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Main Users Table Container -->
 <div class="card admin-card">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-person-lines-fill me-2"></i>Danh Sách Tài Khoản Hệ Thống</span>
-        <span class="badge bg-danger">Chỉ Admin truy cập</span>
+        <span class="fw-bold text-white">
+            <i class="bi bi-list-check text-success me-2"></i>Danh Sách Tài Khoản (@Model.TotalItems người dùng)
+        </span>
+        <span class="badge bg-success">Dữ liệu CSDL thời gian thực</span>
     </div>
+
     <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-dark table-hover align-middle mb-0">
-                <thead>
-                    <tr class="text-secondary small text-uppercase">
-                        <th>Họ Và Tên</th>
-                        <th>Email</th>
-                        <th>Số Điện Thoại</th>
-                        <th>Vai Trò (Role)</th>
-                        <th>Trạng Thái</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td class="fw-bold text-white">Quản Trị Viên</td>
-                        <td>admin@cinema.com</td>
-                        <td>0901234567</td>
-                        <td><span class="badge bg-danger">Admin</span></td>
-                        <td><span class="badge bg-success">Hoạt động</span></td>
-                    </tr>
-                    <tr>
-                        <td class="fw-bold text-white">Nhân Viên Bán Vé</td>
-                        <td>staff@cinema.com</td>
-                        <td>0912345678</td>
-                        <td><span class="badge bg-warning text-dark">Staff</span></td>
-                        <td><span class="badge bg-success">Hoạt động</span></td>
-                    </tr>
-                    <tr>
-                        <td class="fw-bold text-white">Nguyễn Văn Khách</td>
-                        <td>customer@gmail.com</td>
-                        <td>0987654321</td>
-                        <td><span class="badge bg-secondary">Customer</span></td>
-                        <td><span class="badge bg-success">Hoạt động</span></td>
-                    </tr>
-                </tbody>
-            </table>
+        @if (Model.Items != null && Model.Items.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-dark table-hover align-middle mb-0">
+                    <thead>
+                        <tr class="text-secondary small text-uppercase">
+                            <th style="width: 60px;">ID</th>
+                            <th>Họ Và Tên</th>
+                            <th>Email & Điện Thoại</th>
+                            <th>Vai Trò (Role)</th>
+                            <th>Ngày Đăng Ký</th>
+                            <th>Trạng Thái</th>
+                            <th style="width: 220px;" class="text-end pe-3">Phân Quyền & Thao Tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var u in Model.Items)
+                        {
+                            var isSelf = (u.Id == Model.CurrentUserId);
+                            var roleBadge = u.Role switch
+                            {
+                                "Admin" => "bg-danger",
+                                "Staff" => "bg-warning text-dark fw-bold",
+                                _ => "bg-info text-dark"
+                            };
+
+                            <tr>
+                                <td class="text-secondary font-monospace">#@u.Id</td>
+                                <td>
+                                    <div class="fw-bold text-white fs-6">
+                                        @u.FullName
+                                        @if (isSelf)
+                                        {
+                                            <span class="badge bg-primary ms-1" style="font-size: 0.65rem;">(Chính bạn)</span>
+                                        }
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="text-light small"><i class="bi bi-envelope me-1 text-secondary"></i>@u.Email</div>
+                                    <div class="text-secondary small">
+                                        <i class="bi bi-telephone me-1"></i>@(string.IsNullOrEmpty(u.PhoneNumber) ? "Chưa cập nhật SĐT" : u.PhoneNumber)
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge @roleBadge px-2 py-1">
+                                        <i class="bi bi-shield-check me-1"></i>@u.Role
+                                    </span>
+                                </td>
+                                <td class="small text-secondary">
+                                    @u.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+                                </td>
+                                <td>
+                                    @if (u.IsActive)
+                                    {
+                                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-50">
+                                            <i class="bi bi-check-circle-fill me-1"></i>Hoạt động
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-50">
+                                            <i class="bi bi-lock-fill me-1"></i>Đã khóa
+                                        </span>
+                                    }
+                                </td>
+                                <td class="text-end pe-3">
+                                    <div class="d-inline-flex gap-1">
+                                        <!-- Nút Đổi Vai Trò -->
+                                        @if (isSelf)
+                                        {
+                                            <button class="btn btn-sm btn-outline-secondary opacity-50" disabled title="Bạn không thể tự đổi vai trò của chính mình">
+                                                <i class="bi bi-shield me-1"></i>Đổi quyền
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-secondary opacity-50" disabled title="Bạn không thể tự khóa tài khoản của chính mình">
+                                                <i class="bi bi-lock"></i>
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <button type="button" 
+                                                    class="btn btn-sm btn-outline-warning btn-change-role" 
+                                                    data-id="@u.Id" 
+                                                    data-name="@u.FullName" 
+                                                    data-current-role="@u.Role"
+                                                    title="Thay đổi vai trò người dùng">
+                                                <i class="bi bi-shield me-1"></i>Đổi quyền
+                                            </button>
+
+                                            <!-- Nút Khóa / Mở khóa -->
+                                            @if (u.IsActive)
+                                            {
+                                                <button type="button" 
+                                                        class="btn btn-sm btn-outline-danger btn-toggle-status" 
+                                                        data-id="@u.Id" 
+                                                        data-name="@u.FullName" 
+                                                        data-status="false" 
+                                                        title="Khóa tài khoản này">
+                                                    <i class="bi bi-lock-fill"></i>
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button type="button" 
+                                                        class="btn btn-sm btn-outline-success btn-toggle-status" 
+                                                        data-id="@u.Id" 
+                                                        data-name="@u.FullName" 
+                                                        data-status="true" 
+                                                        title="Mở khóa tài khoản này">
+                                                    <i class="bi bi-unlock-fill"></i>
+                                                </button>
+                                            }
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Phân trang (Pagination) -->
+            @if (Model.TotalPages > 1)
+            {
+                <div class="card-footer bg-black border-secondary py-3 d-flex justify-content-between align-items-center">
+                    <span class="text-secondary small">
+                        Hiển thị trang <strong>@Model.PageIndex</strong> / <strong>@Model.TotalPages</strong> (Tổng: @Model.TotalItems tài khoản)
+                    </span>
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0">
+                            <li class="page-item @(Model.PageIndex <= 1 ? "disabled" : "")">
+                                <a class="page-link bg-dark text-white border-secondary" 
+                                   asp-action="Users" 
+                                   asp-route-pageIndex="@(Model.PageIndex - 1)" 
+                                   asp-route-search="@Model.SearchKeyword" 
+                                   asp-route-role="@Model.SelectedRole" 
+                                   asp-route-isActive="@Model.SelectedIsActive">
+                                    <i class="bi bi-chevron-left"></i>
+                                </a>
+                            </li>
+
+                            @for (int p = 1; p <= Model.TotalPages; p++)
+                            {
+                                <li class="page-item @(p == Model.PageIndex ? "active" : "")">
+                                    <a class="page-link @(p == Model.PageIndex ? "bg-success border-success text-white" : "bg-dark text-white border-secondary")" 
+                                       asp-action="Users" 
+                                       asp-route-pageIndex="@p" 
+                                       asp-route-search="@Model.SearchKeyword" 
+                                       asp-route-role="@Model.SelectedRole" 
+                                       asp-route-isActive="@Model.SelectedIsActive">
+                                        @p
+                                    </a>
+                                </li>
+                            }
+
+                            <li class="page-item @(Model.PageIndex >= Model.TotalPages ? "disabled" : "")">
+                                <a class="page-link bg-dark text-white border-secondary" 
+                                   asp-action="Users" 
+                                   asp-route-pageIndex="@(Model.PageIndex + 1)" 
+                                   asp-route-search="@Model.SearchKeyword" 
+                                   asp-route-role="@Model.SelectedRole" 
+                                   asp-route-isActive="@Model.SelectedIsActive">
+                                    <i class="bi bi-chevron-right"></i>
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="text-center py-5">
+                <i class="bi bi-people fs-1 text-secondary d-block mb-3"></i>
+                <h5 class="text-white fw-bold mb-1">Không tìm thấy tài khoản nào</h5>
+                <p class="text-secondary small mb-3">Chưa có người dùng nào phù hợp với bộ lọc tìm kiếm hiện tại.</p>
+                <a asp-action="Users" class="btn btn-sm btn-outline-success rounded-pill px-3">
+                    <i class="bi bi-arrow-repeat me-1"></i> Tải lại danh sách
+                </a>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- MODAL: ĐỔI VAI TRÒ NGƯỜI DÙNG (Change Role)  -->
+<!-- ============================================ -->
+<div class="modal fade" id="roleModal" tabindex="-1" aria-labelledby="roleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark border-secondary text-light">
+            <div class="modal-header border-secondary bg-black">
+                <h5 class="modal-title text-white fw-bold" id="roleModalLabel">
+                    <i class="bi bi-shield-lock-fill text-warning me-2"></i>Thay Đổi Vai Trò Người Dùng
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <input type="hidden" id="modalTargetUserId" value="" />
+                
+                <p class="text-light mb-3">
+                    Bạn đang thay đổi vai trò hệ thống cho tài khoản: <br />
+                    <strong class="text-warning fs-6" id="modalTargetUserName">Nguyễn Văn A</strong>
+                </p>
+
+                <div class="mb-3">
+                    <label class="form-label text-secondary small fw-bold">CHỌN VAI TRÒ MỚI (ROLE) <span class="text-danger">*</span></label>
+                    <select id="modalTargetRole" class="form-select bg-black text-white border-secondary">
+                        <option value="Customer">Customer (Khách hàng thông thường)</option>
+                        <option value="Staff">Staff (Nhân viên bán vé & Soát vé POS)</option>
+                        <option value="Admin">Admin (Quản trị viên toàn quyền hệ thống)</option>
+                    </select>
+                </div>
+                <small class="text-secondary d-block" style="font-size: 0.75rem;">
+                    * Lưu ý: Tài khoản Staff sẽ có quyền truy cập màn hình POS bán vé và quét mã QR soát vé.
+                </small>
+            </div>
+            <div class="modal-footer border-secondary bg-black py-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Hủy bỏ</button>
+                <button type="button" class="btn btn-sm btn-warning px-4 fw-semibold text-dark" id="btnSubmitChangeRole">
+                    <i class="bi bi-check-circle-fill me-1"></i> Lưu Vai Trò Mới
+                </button>
+            </div>
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const roleModal = new bootstrap.Modal(document.getElementById('roleModal'));
+            const modalTargetUserId = document.getElementById('modalTargetUserId');
+            const modalTargetUserName = document.getElementById('modalTargetUserName');
+            const modalTargetRole = document.getElementById('modalTargetRole');
+            const btnSubmitChangeRole = document.getElementById('btnSubmitChangeRole');
+
+            // 1. MỞ MODAL ĐỔI VAI TRÒ
+            document.querySelectorAll('.btn-change-role').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const id = this.getAttribute('data-id');
+                    const name = this.getAttribute('data-name');
+                    const currentRole = this.getAttribute('data-current-role');
+
+                    modalTargetUserId.value = id;
+                    modalTargetUserName.textContent = `${name} (ID: #${id})`;
+                    modalTargetRole.value = currentRole;
+
+                    roleModal.show();
+                });
+            });
+
+            // 2. SUBMIT ĐỔI VAI TRÒ
+            btnSubmitChangeRole?.addEventListener('click', async function () {
+                const id = parseInt(modalTargetUserId.value, 10);
+                const newRole = modalTargetRole.value;
+
+                if (!id || !newRole) return;
+
+                const origText = btnSubmitChangeRole.innerHTML;
+                btnSubmitChangeRole.disabled = true;
+                btnSubmitChangeRole.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Đang cập nhật...';
+
+                try {
+                    const response = await fetch(`/Admin/UpdateUserRole?id=${id}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ role: newRole })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        alert(data.message || 'Cập nhật vai trò người dùng thành công!');
+                        window.location.reload();
+                    } else {
+                        alert(data.message || 'Không thể cập nhật vai trò người dùng.');
+                        btnSubmitChangeRole.disabled = false;
+                        btnSubmitChangeRole.innerHTML = origText;
+                    }
+                } catch (err) {
+                    console.error('Lỗi khi đổi role:', err);
+                    alert('Đã xảy ra lỗi kết nối tới máy chủ khi đổi vai trò.');
+                    btnSubmitChangeRole.disabled = false;
+                    btnSubmitChangeRole.innerHTML = origText;
+                }
+            });
+
+            // 3. KHÓA / MỞ KHÓA TÀI KHOẢN (STATUS TOGGLE)
+            document.querySelectorAll('.btn-toggle-status').forEach(btn => {
+                btn.addEventListener('click', async function () {
+                    const id = parseInt(this.getAttribute('data-id'), 10);
+                    const name = this.getAttribute('data-name');
+                    const newStatus = this.getAttribute('data-status') === 'true';
+
+                    const actionName = newStatus ? 'MỞ KHÓA' : 'KHÓA';
+                    const confirmMsg = `Bạn có chắc chắn muốn ${actionName} tài khoản "${name}" (ID: #${id})?`;
+
+                    if (!confirm(confirmMsg)) return;
+
+                    const origHtml = this.innerHTML;
+                    this.disabled = true;
+                    this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+                    try {
+                        const response = await fetch(`/Admin/UpdateUserStatus?id=${id}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ isActive: newStatus })
+                        });
+
+                        const data = await response.json();
+
+                        if (response.ok) {
+                            alert(data.message || `Đã ${actionName.toLowerCase()} tài khoản thành công!`);
+                            window.location.reload();
+                        } else {
+                            alert(data.message || 'Không thể thay đổi trạng thái tài khoản này.');
+                            this.disabled = false;
+                            this.innerHTML = origHtml;
+                        }
+                    } catch (err) {
+                        console.error('Lỗi khi đổi status:', err);
+                        alert('Đã xảy ra lỗi kết nối tới máy chủ.');
+                        this.disabled = false;
+                        this.innerHTML = origHtml;
+                    }
+                });
+            });
+        });
+    </script>
+}

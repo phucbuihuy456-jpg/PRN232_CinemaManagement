@@ -1,3 +1,9 @@
+using System.Net.Http.Headers;
+using System.Security.Claims;
+using System.Text;
+using System.Text.Json;
+using CinemaWeb.Models;
+using CinemaWeb.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,15 +17,19 @@ namespace CinemaWeb.Controllers
     public class AdminController : Controller
     {
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IMovieApiClient _movieApiClient;
         private readonly string _apiBaseUrl;
         private readonly ILogger<AdminController> _logger;
+        private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
         public AdminController(
             IHttpClientFactory httpClientFactory,
+            IMovieApiClient movieApiClient,
             IConfiguration configuration,
             ILogger<AdminController> logger)
         {
             _httpClientFactory = httpClientFactory;
+            _movieApiClient = movieApiClient;
             _apiBaseUrl = configuration["ApiSettings:BaseUrl"] ?? "http://localhost:5027";
             _logger = logger;
         }
@@ -34,41 +44,711 @@ namespace CinemaWeb.Controllers
         // 2. Quản lý Phim (Dành cho Admin)
         [Authorize(Roles = "Admin")]
         [HttpGet]
-        public IActionResult Movies()
+        public async Task<IActionResult> Movies([FromQuery] string? search, [FromQuery] int? genreId)
         {
-            return View();
+            var model = new AdminMoviesListViewModel
+            {
+                SearchKeyword = search,
+                SelectedGenreId = genreId
+            };
+
+            try
+            {
+                // 1. Tải danh sách thể loại để lọc và hiển thị trong Modal Thêm/Sửa
+                model.Genres = await _movieApiClient.GetGenresAsync();
+
+                // 2. Tải danh sách phim qua OData
+                var movies = await _movieApiClient.GetMoviesFromODataAsync(genreId);
+
+                // 3. Lọc theo từ khóa tìm kiếm (tên phim, đạo diễn, diễn viên) nếu có
+                if (!string.IsNullOrWhiteSpace(search))
+                {
+                    var keyword = search.Trim().ToLower();
+                    movies = movies.Where(m =>
+                        (m.Title != null && m.Title.ToLower().Contains(keyword)) ||
+                        (m.Director != null && m.Director.ToLower().Contains(keyword)) ||
+                        (m.Cast != null && m.Cast.ToLower().Contains(keyword))
+                    ).ToList();
+                }
+
+                model.Movies = movies;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi tải danh sách phim cho Admin.");
+            }
+
+            return View(model);
+        }
+
+        /// <summary>
+        /// Lấy chi tiết 1 bộ phim theo ID để đổ vào Form Sửa (Admin).
+        /// GET: /Admin/GetMovieDetail/{id}
+        /// </summary>
+        [Authorize(Roles = "Admin")]
+        [HttpGet]
+        public async Task<IActionResult> GetMovieDetail(int id)
+        {
+            var client = _httpClientFactory.CreateClient();
+            try
+            {
+                var response = await client.GetAsync($"{_apiBaseUrl}/api/movies/{id}");
+                var content = await response.Content.ReadAsStringAsync();
+
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(content, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi tải chi tiết phim ID {Id}", id);
+                return StatusCode(500, new { message = "Lỗi kết nối khi tải chi tiết phim." });
+            }
+        }
+
+        /// <summary>
+        /// Tạo phim mới (Admin).
+        /// POST: /Admin/CreateMovie
+        /// </summary>
+        [Authorize(Roles = "Admin")]
+        [HttpPost]
+        public async Task<IActionResult> CreateMovie([FromBody] AdminMovieRequestModel request)
+        {
+            if (request == null)
+            {
+                return BadRequest(new { message = "Dữ liệu tạo phim không hợp lệ." });
+            }
+
+            var client = _httpClientFactory.CreateClient();
+            var token = User.FindFirst("JwtToken")?.Value;
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            try
+            {
+                var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
+                var response = await client.PostAsync($"{_apiBaseUrl}/api/movies", content);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(responseContent, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi gọi API tạo phim mới.");
+                return StatusCode(500, new { message = "Không thể kết nối đến máy chủ API để tạo phim." });
+            }
+        }
+
+        /// <summary>
+        /// Cập nhật thông tin phim (Admin).
+        /// POST / PUT: /Admin/UpdateMovie/{id}
+        /// </summary>
+        [Authorize(Roles = "Admin")]
+        [HttpPost]
+        [HttpPut]
+        public async Task<IActionResult> UpdateMovie(int id, [FromBody] AdminMovieRequestModel request)
+        {
+            if (request == null)
+            {
+                return BadRequest(new { message = "Dữ liệu cập nhật phim không hợp lệ." });
+            }
+
+            var client = _httpClientFactory.CreateClient();
+            var token = User.FindFirst("JwtToken")?.Value;
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            try
+            {
+                var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
+                var response = await client.PutAsync($"{_apiBaseUrl}/api/movies/{id}", content);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(responseContent, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi gọi API cập nhật phim ID {Id}", id);
+                return StatusCode(500, new { message = "Không thể kết nối đến máy chủ API để cập nhật phim." });
+            }
+        }
+
+        /// <summary>
+        /// Xóa mềm một bộ phim (Admin).
+        /// POST / DELETE: /Admin/DeleteMovie/{id}
+        /// </summary>
+        [Authorize(Roles = "Admin")]
+        [HttpPost]
+        [HttpDelete]
+        public async Task<IActionResult> DeleteMovie(int id)
+        {
+            var client = _httpClientFactory.CreateClient();
+            var token = User.FindFirst("JwtToken")?.Value;
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            try
+            {
+                var response = await client.DeleteAsync($"{_apiBaseUrl}/api/movies/{id}");
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(responseContent, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi gọi API xóa phim ID {Id}", id);
+                return StatusCode(500, new { message = "Không thể kết nối đến máy chủ API để xóa phim." });
+            }
         }
 
         // 3. Quản lý Suất chiếu (Admin & Staff)
         [HttpGet]
-        public IActionResult Showtimes()
+        public async Task<IActionResult> Showtimes([FromQuery] int? movieId, [FromQuery] string? date)
         {
-            return View();
+            var model = new AdminShowtimesListViewModel
+            {
+                SelectedMovieId = movieId,
+                SelectedDate = date
+            };
+
+            var client = _httpClientFactory.CreateClient();
+
+            // 1. Tải danh sách phim để lọc hoặc tạo mới suất chiếu
+            try
+            {
+                model.Movies = await _movieApiClient.GetMoviesFromODataAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Lỗi khi tải danh sách phim cho Admin Showtimes.");
+            }
+
+            // 2. Tải danh sách phòng chiếu từ API
+            try
+            {
+                var roomsRes = await client.GetAsync($"{_apiBaseUrl}/api/rooms");
+                if (roomsRes.IsSuccessStatusCode)
+                {
+                    var roomsContent = await roomsRes.Content.ReadAsStringAsync();
+                    model.Rooms = JsonSerializer.Deserialize<List<AdminRoomItemViewModel>>(roomsContent, JsonOptions) ?? new();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Lỗi khi tải danh sách phòng chiếu.");
+            }
+
+            // Fallback danh sách phòng mẫu nếu API chưa trả về
+            if (!model.Rooms.Any())
+            {
+                model.Rooms = new List<AdminRoomItemViewModel>
+                {
+                    new() { Id = 1, Name = "Phòng Chiếu 01", ScreenType = "2D Digital", TotalSeats = 30 },
+                    new() { Id = 2, Name = "Phòng Chiếu 02", ScreenType = "3D IMAX", TotalSeats = 30 }
+                };
+            }
+
+            // 3. Tải danh sách suất chiếu từ API (có hỗ trợ lọc theo movieId hoặc date)
+            try
+            {
+                var queryParams = new List<string>();
+                if (movieId.HasValue && movieId.Value > 0)
+                {
+                    queryParams.Add($"movieId={movieId.Value}");
+                }
+                if (!string.IsNullOrWhiteSpace(date))
+                {
+                    queryParams.Add($"date={date}");
+                }
+
+                var queryStr = queryParams.Any() ? "?" + string.Join("&", queryParams) : "";
+                var res = await client.GetAsync($"{_apiBaseUrl}/api/showtimes{queryStr}");
+
+                if (res.IsSuccessStatusCode)
+                {
+                    var content = await res.Content.ReadAsStringAsync();
+                    var list = JsonSerializer.Deserialize<List<AdminShowtimeItemViewModel>>(content, JsonOptions);
+                    if (list != null)
+                    {
+                        model.Showtimes = list.OrderByDescending(s => s.StartTime).ToList();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi gọi API showtimes cho Admin.");
+            }
+
+            return View(model);
         }
 
-        // 4. Quản lý Combo bắp nước (Admin)
+        /// <summary>
+        /// Tạo suất chiếu mới (Chỉ dành cho Admin).
+        /// POST: /Admin/CreateShowtime
+        /// </summary>
         [Authorize(Roles = "Admin")]
-        [HttpGet]
-        public IActionResult Combos()
+        [HttpPost]
+        public async Task<IActionResult> CreateShowtime([FromBody] CreateShowtimeRequestModel request)
         {
-            return View();
+            if (request == null)
+            {
+                return BadRequest(new { message = "Dữ liệu tạo suất chiếu không hợp lệ." });
+            }
+
+            var client = _httpClientFactory.CreateClient();
+
+            // Đính kèm JWT Token của Admin từ Cookie Claims
+            var token = User.FindFirst("JwtToken")?.Value;
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            try
+            {
+                var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
+                var response = await client.PostAsync($"{_apiBaseUrl}/api/showtimes", content);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(responseContent, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi gọi API tạo suất chiếu mới.");
+                return StatusCode(500, new { message = "Không thể kết nối đến máy chủ quản lý suất chiếu." });
+            }
         }
 
-        // 5. Quản lý Thể loại phim (Admin)
+        /// <summary>
+        /// Xóa mềm một suất chiếu (Chỉ dành cho Admin).
+        /// POST / DELETE: /Admin/DeleteShowtime/{id}
+        /// </summary>
         [Authorize(Roles = "Admin")]
-        [HttpGet]
-        public IActionResult Genres()
+        [HttpPost]
+        [HttpDelete]
+        public async Task<IActionResult> DeleteShowtime(int id)
         {
-            return View();
+            var client = _httpClientFactory.CreateClient();
+
+            // Đính kèm JWT Token của Admin từ Cookie Claims
+            var token = User.FindFirst("JwtToken")?.Value;
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            try
+            {
+                var response = await client.DeleteAsync($"{_apiBaseUrl}/api/showtimes/{id}");
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(responseContent, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi gọi API xóa suất chiếu ID {Id}", id);
+                return StatusCode(500, new { message = "Không thể kết nối đến máy chủ API để xóa suất chiếu." });
+            }
         }
 
-        // 6. Quản lý Người dùng & Phân quyền (Admin duy nhất)
+        #region 4. Quản lý Combo bắp nước (Admin)
+
         [Authorize(Roles = "Admin")]
         [HttpGet]
-        public IActionResult Users()
+        public async Task<IActionResult> Combos([FromQuery] string? search)
         {
-            return View();
+            var model = new AdminCombosListViewModel { SearchKeyword = search };
+            var client = _httpClientFactory.CreateClient();
+
+            try
+            {
+                var response = await client.GetAsync($"{_apiBaseUrl}/api/combos?includeInactive=true");
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    var list = JsonSerializer.Deserialize<List<AdminComboItemViewModel>>(content, JsonOptions) ?? new();
+                    if (!string.IsNullOrWhiteSpace(search))
+                    {
+                        var kw = search.Trim().ToLower();
+                        list = list.Where(c => c.Name.ToLower().Contains(kw) || (c.Description != null && c.Description.ToLower().Contains(kw))).ToList();
+                    }
+                    model.Combos = list;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi tải danh sách combo cho Admin.");
+            }
+
+            return View(model);
         }
+
+        [Authorize(Roles = "Admin")]
+        [HttpGet]
+        public async Task<IActionResult> GetComboDetail(int id)
+        {
+            var client = _httpClientFactory.CreateClient();
+            try
+            {
+                var response = await client.GetAsync($"{_apiBaseUrl}/api/combos/{id}");
+                var content = await response.Content.ReadAsStringAsync();
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(content, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi lấy chi tiết combo ID {Id}", id);
+                return StatusCode(500, new { message = "Lỗi kết nối tới API combo." });
+            }
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPost]
+        public async Task<IActionResult> CreateCombo([FromBody] AdminComboRequestModel request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.Name))
+            {
+                return BadRequest(new { message = "Tên combo không được để trống." });
+            }
+
+            var client = _httpClientFactory.CreateClient();
+            var token = User.FindFirst("JwtToken")?.Value;
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            try
+            {
+                var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
+                var response = await client.PostAsync($"{_apiBaseUrl}/api/combos", content);
+                var responseContent = await response.Content.ReadAsStringAsync();
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(responseContent, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi tạo combo mới.");
+                return StatusCode(500, new { message = "Lỗi kết nối máy chủ khi tạo combo." });
+            }
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPost]
+        [HttpPut]
+        public async Task<IActionResult> UpdateCombo(int id, [FromBody] AdminComboRequestModel request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.Name))
+            {
+                return BadRequest(new { message = "Tên combo không được để trống." });
+            }
+
+            var client = _httpClientFactory.CreateClient();
+            var token = User.FindFirst("JwtToken")?.Value;
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            try
+            {
+                var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
+                var response = await client.PutAsync($"{_apiBaseUrl}/api/combos/{id}", content);
+                var responseContent = await response.Content.ReadAsStringAsync();
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(responseContent, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi cập nhật combo ID {Id}", id);
+                return StatusCode(500, new { message = "Lỗi kết nối máy chủ khi cập nhật combo." });
+            }
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPost]
+        [HttpDelete]
+        public async Task<IActionResult> DeleteCombo(int id)
+        {
+            var client = _httpClientFactory.CreateClient();
+            var token = User.FindFirst("JwtToken")?.Value;
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            try
+            {
+                var response = await client.DeleteAsync($"{_apiBaseUrl}/api/combos/{id}");
+                var responseContent = await response.Content.ReadAsStringAsync();
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(responseContent, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi xóa combo ID {Id}", id);
+                return StatusCode(500, new { message = "Lỗi kết nối máy chủ khi xóa combo." });
+            }
+        }
+
+        #endregion
+
+        #region 5. Quản lý Thể loại phim (Admin)
+
+        [Authorize(Roles = "Admin")]
+        [HttpGet]
+        public async Task<IActionResult> Genres([FromQuery] string? search)
+        {
+            var model = new AdminGenresListViewModel { SearchKeyword = search };
+            var client = _httpClientFactory.CreateClient();
+
+            try
+            {
+                var response = await client.GetAsync($"{_apiBaseUrl}/api/genres");
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    var list = JsonSerializer.Deserialize<List<AdminGenreItemViewModel>>(content, JsonOptions) ?? new();
+                    if (!string.IsNullOrWhiteSpace(search))
+                    {
+                        var kw = search.Trim().ToLower();
+                        list = list.Where(g => g.Name.ToLower().Contains(kw)).ToList();
+                    }
+                    model.Genres = list.OrderBy(g => g.Name).ToList();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi tải danh sách thể loại cho Admin.");
+            }
+
+            return View(model);
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPost]
+        public async Task<IActionResult> CreateGenre([FromBody] AdminGenreRequestModel request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.Name))
+            {
+                return BadRequest(new { message = "Tên thể loại không được để trống." });
+            }
+
+            var client = _httpClientFactory.CreateClient();
+            var token = User.FindFirst("JwtToken")?.Value;
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            try
+            {
+                var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
+                var response = await client.PostAsync($"{_apiBaseUrl}/api/genres", content);
+                var responseContent = await response.Content.ReadAsStringAsync();
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(responseContent, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi tạo thể loại mới.");
+                return StatusCode(500, new { message = "Lỗi kết nối máy chủ khi tạo thể loại." });
+            }
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPost]
+        [HttpPut]
+        public async Task<IActionResult> UpdateGenre(int id, [FromBody] AdminGenreRequestModel request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.Name))
+            {
+                return BadRequest(new { message = "Tên thể loại không được để trống." });
+            }
+
+            var client = _httpClientFactory.CreateClient();
+            var token = User.FindFirst("JwtToken")?.Value;
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            try
+            {
+                var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
+                var response = await client.PutAsync($"{_apiBaseUrl}/api/genres/{id}", content);
+                var responseContent = await response.Content.ReadAsStringAsync();
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(responseContent, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi cập nhật thể loại ID {Id}", id);
+                return StatusCode(500, new { message = "Lỗi kết nối máy chủ khi cập nhật thể loại." });
+            }
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPost]
+        [HttpDelete]
+        public async Task<IActionResult> DeleteGenre(int id)
+        {
+            var client = _httpClientFactory.CreateClient();
+            var token = User.FindFirst("JwtToken")?.Value;
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            try
+            {
+                var response = await client.DeleteAsync($"{_apiBaseUrl}/api/genres/{id}");
+                var responseContent = await response.Content.ReadAsStringAsync();
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(responseContent, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi xóa thể loại ID {Id}", id);
+                return StatusCode(500, new { message = "Lỗi kết nối máy chủ khi xóa thể loại." });
+            }
+        }
+
+        #endregion
+
+        #region 6. Quản lý Người dùng & Phân quyền (Admin duy nhất)
+
+        [Authorize(Roles = "Admin")]
+        [HttpGet]
+        public async Task<IActionResult> Users([FromQuery] int pageIndex = 1, [FromQuery] string? search = null, [FromQuery] string? role = null, [FromQuery] bool? isActive = null)
+        {
+            var currentUserIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            int currentUserId = int.TryParse(currentUserIdStr, out int uid) ? uid : 0;
+
+            var model = new AdminUsersListViewModel
+            {
+                PageIndex = pageIndex < 1 ? 1 : pageIndex,
+                SearchKeyword = search,
+                SelectedRole = role,
+                SelectedIsActive = isActive,
+                CurrentUserId = currentUserId
+            };
+
+            var client = _httpClientFactory.CreateClient();
+            var token = User.FindFirst("JwtToken")?.Value;
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            try
+            {
+                var qParams = new List<string> { $"pageIndex={model.PageIndex}", "pageSize=10" };
+                if (!string.IsNullOrWhiteSpace(search)) qParams.Add($"search={Uri.EscapeDataString(search.Trim())}");
+                if (!string.IsNullOrWhiteSpace(role)) qParams.Add($"role={Uri.EscapeDataString(role.Trim())}");
+                if (isActive.HasValue) qParams.Add($"isActive={isActive.Value}");
+
+                var url = $"{_apiBaseUrl}/api/users?" + string.Join("&", qParams);
+                var response = await client.GetAsync(url);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    using var doc = JsonDocument.Parse(content);
+                    var root = doc.RootElement;
+
+                    if (root.TryGetProperty("totalItems", out var totalProp)) model.TotalItems = totalProp.GetInt32();
+                    if (root.TryGetProperty("pageIndex", out var piProp)) model.PageIndex = piProp.GetInt32();
+                    if (root.TryGetProperty("pageSize", out var psProp)) model.PageSize = psProp.GetInt32();
+
+                    if (root.TryGetProperty("items", out var itemsProp) && itemsProp.ValueKind == JsonValueKind.Array)
+                    {
+                        var items = JsonSerializer.Deserialize<List<AdminUserItemViewModel>>(itemsProp.GetRawText(), JsonOptions);
+                        if (items != null) model.Items = items;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi tải danh sách người dùng cho Admin.");
+            }
+
+            return View(model);
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPost]
+        public async Task<IActionResult> UpdateUserRole(int id, [FromBody] UpdateUserRoleRequestModel request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.Role))
+            {
+                return BadRequest(new { message = "Vai trò người dùng không hợp lệ." });
+            }
+
+            var client = _httpClientFactory.CreateClient();
+            var token = User.FindFirst("JwtToken")?.Value;
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            try
+            {
+                var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
+                var response = await client.PutAsync($"{_apiBaseUrl}/api/users/{id}/role", content);
+                var responseContent = await response.Content.ReadAsStringAsync();
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(responseContent, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi cập nhật vai trò người dùng ID {Id}", id);
+                return StatusCode(500, new { message = "Lỗi kết nối máy chủ khi cập nhật vai trò." });
+            }
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPost]
+        public async Task<IActionResult> UpdateUserStatus(int id, [FromBody] UpdateUserStatusRequestModel request)
+        {
+            if (request == null)
+            {
+                return BadRequest(new { message = "Dữ liệu trạng thái người dùng không hợp lệ." });
+            }
+
+            var client = _httpClientFactory.CreateClient();
+            var token = User.FindFirst("JwtToken")?.Value;
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            try
+            {
+                var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
+                var response = await client.PutAsync($"{_apiBaseUrl}/api/users/{id}/status", content);
+                var responseContent = await response.Content.ReadAsStringAsync();
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(responseContent, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi cập nhật trạng thái người dùng ID {Id}", id);
+                return StatusCode(500, new { message = "Lỗi kết nối máy chủ khi cập nhật trạng thái." });
+            }
+        }
+
+        #endregion
 
         #region Reports API Proxies for Chart.js Dashboard
 

@@ -4,6 +4,7 @@ namespace CinemaWeb.Models
     {
         public List<PosShowtimeItem> Showtimes { get; set; } = new();
         public List<ComboItemViewModel> Combos { get; set; } = new();
+        public string SelectedDate { get; set; } = DateTime.Today.ToString("yyyy-MM-dd");
     }
 
     public class PosShowtimeItem
@@ -20,6 +21,10 @@ namespace CinemaWeb.Models
         public decimal BasePrice { get; set; }
         public int AvailableSeats { get; set; }
         public int TotalSeats { get; set; }
+
+        public bool IsEnded => EndTime <= DateTime.Now;
+        public bool IsOngoing => StartTime <= DateTime.Now && EndTime > DateTime.Now;
+        public bool IsUpcoming => StartTime > DateTime.Now;
     }
 
     public class PosCheckoutRequestModel

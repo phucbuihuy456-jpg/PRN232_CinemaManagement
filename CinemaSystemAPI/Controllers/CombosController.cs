@@ -1,5 +1,6 @@
 using CinemaSystemAPI.DTOs.Combos;
 using CinemaSystemAPI.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -78,6 +79,7 @@ namespace CinemaSystemAPI.Controllers
         /// <summary>
         /// Tạo combo bắp nước mới.
         /// </summary>
+        [Authorize(Roles = "Admin")]
         [HttpPost]
         public async Task<ActionResult<ComboDto>> Create([FromBody] CreateComboDto dto)
         {
@@ -114,6 +116,7 @@ namespace CinemaSystemAPI.Controllers
         /// <summary>
         /// Cập nhật combo (Tên, Mô tả, Giá, Ảnh, Trạng thái).
         /// </summary>
+        [Authorize(Roles = "Admin")]
         [HttpPut("{id:int}")]
         public async Task<ActionResult<ComboDto>> Update(int id, [FromBody] UpdateComboDto dto)
         {
@@ -150,6 +153,7 @@ namespace CinemaSystemAPI.Controllers
         /// <summary>
         /// Soft delete combo (Chuyển trạng thái IsActive sang false).
         /// </summary>
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> SoftDelete(int id)
         {
