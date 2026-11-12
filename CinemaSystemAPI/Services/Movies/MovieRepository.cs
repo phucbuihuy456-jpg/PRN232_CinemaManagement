@@ -81,8 +81,17 @@ namespace CinemaSystemAPI.Services.Movies
                 AgeRating = movie.AgeRating,
                 DurationMinutes = movie.DurationMinutes,
                 ReleaseDate = movie.ReleaseDate,
+                EndDate = movie.EndDate,
                 MovieGenres = movie.MovieGenres,
-                TrailerUrl = movie.TrailerUrl
+                TrailerUrl = movie.TrailerUrl,
+                Description = movie.Description,
+                Director = movie.Director,
+                Cast = movie.Cast,
+                Language = movie.Language,
+                Genres = movie.MovieGenres
+                    .Where(mg => mg.Genre != null)
+                    .Select(mg => mg.Genre!.Name)
+                    .ToList()
             };
         }
 

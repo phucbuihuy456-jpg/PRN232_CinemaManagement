@@ -52,17 +52,7 @@
                                             @movie.Description
                                         </p>
 
-                                        <div class="d-flex flex-wrap gap-3">
-                                            <a asp-controller="Booking" asp-action="SeatMap" asp-route-id="1" class="btn btn-danger btn-lg px-4 fw-bold shadow-lg">
-                                                <i class="bi bi-ticket-perforated-fill me-2"></i> Đặt Vé Ngay
-                                            </a>
-                                            @if (!string.IsNullOrEmpty(movie.TrailerUrl))
-                                            {
-                                                <a href="@movie.TrailerUrl" target="_blank" class="btn btn-outline-light btn-lg px-4">
-                                                    <i class="bi bi-play-circle me-2"></i> Xem Trailer
-                                                </a>
-                                            }
-                                        </div>
+                                        
                                     </div>
                                 </div>
                             </div>
@@ -143,23 +133,27 @@
                                         };
                                         <span class="movie-age-badge @badgeClass">@movie.AgeRating</span>
                                     }
-                                    <img src="@(string.IsNullOrEmpty(movie.PosterUrl) ? "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500" : movie.PosterUrl)" 
-                                         alt="@movie.Title" 
-                                         class="movie-poster-img"
-                                         loading="lazy" />
+                                    <a asp-controller="Home" asp-action="Detail" asp-route-id="@movie.Id" class="movie-poster-link d-block w-100 h-100" title="Bấm để xem chi tiết @movie.Title">
+                                        <img src="@(string.IsNullOrEmpty(movie.PosterUrl) ? "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500" : movie.PosterUrl)" 
+                                             alt="@movie.Title" 
+                                             class="movie-poster-img"
+                                             loading="lazy" />
+                                    </a>
                                 </div>
                                 <div class="p-3 d-flex flex-column flex-grow-1">
-                                    <h6 class="fw-bold text-white mb-1 text-truncate" title="@movie.Title">@movie.Title</h6>
+                                    <a asp-controller="Home" asp-action="Detail" asp-route-id="@movie.Id" class="text-decoration-none">
+                                        <h6 class="fw-bold text-white mb-1 text-truncate" title="@movie.Title">@movie.Title</h6>
+                                    </a>
                                     
-                                    <div class="small text-muted mb-2 d-flex justify-content-between align-items-center">
-                                        <span><i class="bi bi-clock me-1"></i>@movie.DurationMinutes'</span>
-                                        <span class="text-truncate" style="max-width: 140px;" title="@string.Join(", ", movie.MovieGenres.Where(g => g.Genre != null).Select(g => g.Genre!.Name))">
+                                    <div class="small text-white-50 mb-2 d-flex justify-content-between align-items-center">
+                                        <span><i class="bi bi-clock me-1 text-danger"></i>@movie.DurationMinutes'</span>
+                                        <span class="text-truncate text-secondary" style="max-width: 140px;" title="@string.Join(", ", movie.MovieGenres.Where(g => g.Genre != null).Select(g => g.Genre!.Name))">
                                             @string.Join(", ", movie.MovieGenres.Where(g => g.Genre != null).Select(g => g.Genre!.Name))
                                         </span>
                                     </div>
 
                                     <div class="mt-auto pt-2">
-                                        <a asp-controller="Booking" asp-action="SeatMap" asp-route-id="1" class="btn btn-danger w-100 fw-semibold btn-sm py-2">
+                                        <a asp-controller="Booking" asp-action="SeatMap" asp-route-id="@movie.Id" class="btn btn-danger w-100 fw-semibold btn-sm py-2">
                                             <i class="bi bi-ticket-perforated me-1"></i> Đặt Vé
                                         </a>
                                     </div>
@@ -200,33 +194,34 @@
                                         };
                                         <span class="movie-age-badge @badgeClass">@movie.AgeRating</span>
                                     }
-                                    <img src="@(string.IsNullOrEmpty(movie.PosterUrl) ? "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500" : movie.PosterUrl)" 
-                                         alt="@movie.Title" 
-                                         class="movie-poster-img"
-                                         loading="lazy" />
+                                    <a asp-controller="Home" asp-action="Detail" asp-route-id="@movie.Id" class="movie-poster-link d-block w-100 h-100" title="Bấm để xem chi tiết @movie.Title">
+                                        <img src="@(string.IsNullOrEmpty(movie.PosterUrl) ? "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500" : movie.PosterUrl)" 
+                                             alt="@movie.Title" 
+                                             class="movie-poster-img"
+                                             loading="lazy" />
+                                    </a>
                                 </div>
                                 <div class="p-3 d-flex flex-column flex-grow-1">
-                                    <h6 class="fw-bold text-white mb-1 text-truncate" title="@movie.Title">@movie.Title</h6>
+                                    <a asp-controller="Home" asp-action="Detail" asp-route-id="@movie.Id" class="text-decoration-none">
+                                        <h6 class="fw-bold text-white mb-1 text-truncate" title="@movie.Title">@movie.Title</h6>
+                                    </a>
                                     
-                                    <div class="small text-muted mb-2 d-flex justify-content-between align-items-center">
-                                        <span><i class="bi bi-clock me-1"></i>@movie.DurationMinutes'</span>
+                                    <div class="small text-white-50 mb-2 d-flex justify-content-between align-items-center">
+                                        <span><i class="bi bi-clock me-1 text-warning"></i>@movie.DurationMinutes'</span>
                                         <span class="text-info fw-semibold">
                                             <i class="bi bi-calendar-event me-1"></i>@movie.ReleaseDate.ToString("dd/MM/yyyy")
                                         </span>
                                     </div>
 
-                                    <div class="mt-auto pt-2">
+                                    <div class="mt-auto pt-2 d-flex gap-2">
+                                        <a asp-controller="Home" asp-action="Detail" asp-route-id="@movie.Id" class="btn btn-outline-danger flex-grow-1 fw-semibold btn-sm py-2">
+                                            <i class="bi bi-info-circle me-1"></i> Chi Tiết
+                                        </a>
                                         @if (!string.IsNullOrEmpty(movie.TrailerUrl))
                                         {
-                                            <a href="@movie.TrailerUrl" target="_blank" class="btn btn-outline-light w-100 fw-semibold btn-sm py-2">
-                                                <i class="bi bi-play-circle me-1"></i> Trailer
+                                            <a href="@movie.TrailerUrl" target="_blank" class="btn btn-outline-light fw-semibold btn-sm py-2 px-3" title="Xem Trailer">
+                                                <i class="bi bi-play-circle"></i>
                                             </a>
-                                        }
-                                        else
-                                        {
-                                            <button class="btn btn-secondary w-100 fw-semibold btn-sm py-2" disabled>
-                                                Sắp Ra Mắt
-                                            </button>
                                         }
                                     </div>
                                 </div>

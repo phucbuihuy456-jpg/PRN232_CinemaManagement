@@ -7,6 +7,7 @@ namespace CinemaWeb.Services
     {
         Task<List<GenreViewModel>> GetGenresAsync();
         Task<List<MovieItemViewModel>> GetMoviesFromODataAsync(int? genreId = null);
+        Task<MovieItemViewModel?> GetMovieByIdAsync(int id);
     }
 
     public class MovieApiClient : IMovieApiClient
@@ -28,6 +29,30 @@ namespace CinemaWeb.Services
             {
                 PropertyNameCaseInsensitive = true
             };
+        }
+
+        public async Task<MovieItemViewModel?> GetMovieByIdAsync(int id)
+        {
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                var response = await client.GetAsync($"{_apiBaseUrl}/api/movies/{id}");
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadAsStringAsync();
+                    var movie = JsonSerializer.Deserialize<MovieItemViewModel>(json, _jsonOptions);
+                    return movie;
+                }
+                else
+                {
+                    _logger.LogWarning("Không tìm thấy phim ID {Id}. Status: {StatusCode}", id, response.StatusCode);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi gọi API lấy chi tiết phim {Id}", id);
+            }
+            return null;
         }
 
         public async Task<List<GenreViewModel>> GetGenresAsync()

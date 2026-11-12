@@ -1,0 +1,166 @@
+@model CinemaWeb.Models.MovieItemViewModel
+@{
+    ViewData["Title"] = Model.Title + " - Chi Tiết Phim";
+
+    // Chuẩn hóa trailer url nếu là Youtube watch link
+    string? embedTrailerUrl = null;
+    if (!string.IsNullOrEmpty(Model.TrailerUrl))
+    {
+        if (Model.TrailerUrl.Contains("youtube.com/watch?v="))
+        {
+            embedTrailerUrl = Model.TrailerUrl.Replace("watch?v=", "embed/").Split('&')[0];
+        }
+        else if (Model.TrailerUrl.Contains("youtu.be/"))
+        {
+            embedTrailerUrl = Model.TrailerUrl.Replace("youtu.be/", "youtube.com/embed/");
+        }
+        else
+        {
+            embedTrailerUrl = Model.TrailerUrl;
+        }
+    }
+
+    var badgeClass = Model.AgeRating switch
+    {
+        "P" => "badge-age-p",
+        "C13" => "badge-age-c13",
+        "C16" => "badge-age-c16",
+        "C18" => "badge-age-c18",
+        _ => "bg-secondary text-white"
+    };
+
+    var posterUrl = !string.IsNullOrEmpty(Model.PosterUrl) 
+        ? Model.PosterUrl 
+        : "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800";
+}
+
+<!-- BACKDROP HEADER -->
+<div class="movie-detail-backdrop position-relative py-5" style="background: linear-gradient(180deg, rgba(20,20,20,0.85) 0%, rgba(20,20,20,1) 100%), url('@posterUrl') center/cover no-repeat;">
+    <div class="container py-4">
+        <!-- Nút quay lại -->
+        <div class="mb-4">
+            <a asp-controller="Home" asp-action="Index" class="btn btn-outline-light btn-sm rounded-pill px-3">
+                <i class="bi bi-arrow-left me-1"></i> Quay lại trang chủ
+            </a>
+        </div>
+
+        <div class="row g-4 align-items-start">
+            <!-- Cột Poster -->
+            <div class="col-12 col-md-4 col-lg-3 text-center text-md-start">
+                <div class="detail-poster-wrapper rounded-4 overflow-hidden shadow-lg border border-secondary border-opacity-25 position-relative">
+                    @if (!string.IsNullOrEmpty(Model.AgeRating))
+                    {
+                        <span class="movie-age-badge @badgeClass">@Model.AgeRating</span>
+                    }
+                    <img src="@posterUrl" alt="@Model.Title" class="img-fluid w-100 detail-poster-img" />
+                </div>
+            </div>
+
+            <!-- Cột Thông tin chính -->
+            <div class="col-12 col-md-8 col-lg-9">
+                <!-- Badges trạng thái & thời lượng -->
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                    @if (Model.IsNowShowing)
+                    {
+                        <span class="badge bg-danger px-3 py-2 fs-6"><i class="bi bi-play-circle-fill me-1"></i> Đang Chiếu</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-warning text-dark px-3 py-2 fs-6"><i class="bi bi-calendar2-week-fill me-1"></i> Sắp Chiếu</span>
+                    }
+                    <span class="badge bg-dark border border-secondary px-3 py-2 fs-6 text-white-50">
+                        <i class="bi bi-clock me-1 text-danger"></i> @Model.DurationMinutes phút
+                    </span>
+                    <span class="badge bg-dark border border-secondary px-3 py-2 fs-6 text-white-50">
+                        <i class="bi bi-translate me-1 text-info"></i> @(string.IsNullOrEmpty(Model.Language) ? "Tiếng Việt" : Model.Language)
+                    </span>
+                </div>
+
+                <!-- Tên phim -->
+                <h1 class="display-5 fw-bold text-white mb-3 text-uppercase">@Model.Title</h1>
+
+                <!-- Thông số chi tiết -->
+                <div class="bg-dark bg-opacity-50 p-4 rounded-4 border border-secondary border-opacity-25 mb-4">
+                    <div class="row g-3">
+                        <div class="col-sm-6">
+                            <span class="text-white-50 d-block small mb-1"><i class="bi bi-tags-fill me-1 text-danger"></i> Thể Loại</span>
+                            <span class="fw-semibold text-light">@Model.GenreDisplay</span>
+                        </div>
+                        <div class="col-sm-6">
+                            <span class="text-white-50 d-block small mb-1"><i class="bi bi-person-video me-1 text-warning"></i> Đạo Diễn</span>
+                            <span class="fw-semibold text-light">@(string.IsNullOrEmpty(Model.Director) ? "Đang cập nhật" : Model.Director)</span>
+                        </div>
+                        <div class="col-sm-6">
+                            <span class="text-white-50 d-block small mb-1"><i class="bi bi-people-fill me-1 text-primary"></i> Diễn Viên</span>
+                            <span class="fw-semibold text-light">@(string.IsNullOrEmpty(Model.Cast) ? "Đang cập nhật" : Model.Cast)</span>
+                        </div>
+                        <div class="col-sm-6">
+                            <span class="text-white-50 d-block small mb-1"><i class="bi bi-calendar-event me-1 text-success"></i> Khởi Chiếu</span>
+                            <span class="fw-semibold text-light">@Model.ReleaseDate.ToString("dd/MM/yyyy")</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Nút hành động đặt vé -->
+                <div class="d-flex flex-wrap gap-3">
+                    <a asp-controller="Booking" asp-action="SeatMap" asp-route-id="@Model.Id" class="btn btn-danger btn-lg px-4 py-3 fw-bold rounded-3 shadow">
+                        <i class="bi bi-ticket-perforated-fill me-2"></i> Mua Vé Ngay
+                        </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- NỘI DUNG TÓM TẮT & TRAILER -->
+<div class="container py-5">
+    <div class="row g-5">
+        <!-- Tóm tắt nội dung -->
+        <div class="col-lg-8">
+            <h4 class="text-white fw-bold mb-3 border-start border-4 border-danger ps-3">
+                Nội Dung Phim
+            </h4>
+            <div class="text-light opacity-85 lh-lg mb-5" style="font-size: 1.05rem;">
+                @if (!string.IsNullOrEmpty(Model.Description))
+                {
+                    <p style="white-space: pre-line;">@Model.Description</p>
+                }
+                else
+                {
+                    <p class="text-white-50 fst-italic">Thông tin tóm tắt nội dung của phim đang được ban biên tập cập nhật.</p>
+                }
+            </div>
+
+            <!-- Khung xem Trailer Video -->
+            @if (!string.IsNullOrEmpty(embedTrailerUrl))
+            {
+                <div id="trailerSection" class="mb-5">
+                    <h4 class="text-white fw-bold mb-3 border-start border-4 border-danger ps-3">
+                        Trailer Phim
+                    </h4>
+                    <div class="ratio ratio-16x9 rounded-4 overflow-hidden shadow-lg border border-secondary border-opacity-25">
+                        <iframe src="@embedTrailerUrl" 
+                                title="Trailer @Model.Title" 
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                allowfullscreen></iframe>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Cột Phải: Quy định & Ưu đãi -->
+        <div class="col-lg-4">
+            <div class="p-4 rounded-4 bg-dark border border-secondary border-opacity-25 shadow-sm">
+                <h5 class="text-white fw-bold mb-3">
+                    <i class="bi bi-shield-exclamation text-warning me-2"></i> Lưu Ý Quan Trọng
+                </h5>
+                <ul class="text-white-50 small mb-0 ps-3 lh-lg">
+                    <li>Vui lòng đến trước giờ chiếu ít nhất 15 phút để lấy vé và vào phòng chiếu.</li>
+                    <li>Phim có phân loại độ tuổi, vui lòng mang theo giấy tờ tùy thân có ảnh khi nhận vé tại rạp.</li>
+                    <li>Không mang thức ăn, đồ uống bên ngoài vào phòng chiếu.</li>
+                    <li>Vé đã đặt thành công không áp dụng hoàn tiền hoặc hủy vé theo quy định.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>

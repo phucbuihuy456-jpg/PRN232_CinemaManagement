@@ -28,6 +28,19 @@ namespace CinemaWeb.Models
         public string? AgeRating { get; set; }
         public string? Language { get; set; }
         public List<MovieGenreItemViewModel> MovieGenres { get; set; } = new();
+        public List<string> Genres { get; set; } = new();
+
+        public string GenreDisplay
+        {
+            get
+            {
+                if (Genres != null && Genres.Any())
+                    return string.Join(", ", Genres);
+                if (MovieGenres != null && MovieGenres.Any())
+                    return string.Join(", ", MovieGenres.Where(g => g.Genre != null).Select(g => g.Genre!.Name));
+                return "Đang cập nhật";
+            }
+        }
 
         public bool IsNowShowing
         {

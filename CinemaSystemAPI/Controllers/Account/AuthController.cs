@@ -134,5 +134,49 @@ namespace CinemaSystemAPI.Controllers.Account
                 return BadRequest(new { message = ex.Message });
             }
         }
+
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequestDTO request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                await _accountRepository.SendForgotPasswordOtp(request.Email);
+                return Ok(new
+                {
+                    message = "Mã xác thực OTP đã được gửi về email của bạn. Vui lòng kiểm tra hộp thư (bao gồm cả thư rác/spam)!"
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordOtpDTO request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                await _accountRepository.ResetPasswordWithOtp(request);
+                return Ok(new
+                {
+                    message = "Đặt lại mật khẩu thành công! Vui lòng đăng nhập bằng mật khẩu mới."
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
     }
 }

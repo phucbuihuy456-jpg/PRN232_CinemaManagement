@@ -1,15 +1,25 @@
 using CinemaSystemAPI.DTOs.User;
 using CinemaSystemAPI.Models;
+using CinemaSystemAPI.Services.Email;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace CinemaSystemAPI.Services.Account
 {
     public class AccountRepository : IAccountRepository
     {
         private readonly CinemaDbContext _context;
-        public AccountRepository(CinemaDbContext context)
+        private readonly IMemoryCache _memoryCache;
+        private readonly IEmailService _emailService;
+
+        public AccountRepository(
+            CinemaDbContext context,
+            IMemoryCache memoryCache,
+            IEmailService emailService)
         {
             _context = context;
+            _memoryCache = memoryCache;
+            _emailService = emailService;
         }
 
         public async Task<bool> ChangePassword(int id, ChangePasswordDTO user)
@@ -137,6 +147,66 @@ namespace CinemaSystemAPI.Services.Account
                 await _context.SaveChangesAsync();
                 return checkUser;
             }
+        }
+
+        public async Task<bool> SendForgotPasswordOtp(string email)
+        {
+            var normalizedEmail = email.Trim().ToLower();
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail && u.IsActive);
+            if (user == null)
+            {
+                throw new Exception("Không tìm thấy tài khoản với email này trong hệ thống!");
+            }
+
+            // Sinh mã OTP 6 chữ số
+            var otpCode = Random.Shared.Next(100000, 999999).ToString();
+
+            // Lưu vào MemoryCache trong 5 phút
+            var cacheKey = $"otp_reset_{normalizedEmail}";
+            _memoryCache.Set(cacheKey, otpCode, TimeSpan.FromMinutes(5));
+
+            // Gửi email chứa mã OTP
+            await _emailService.SendOtpEmailAsync(user.Email, user.FullName, otpCode);
+            return true;
+        }
+
+        public async Task<bool> ResetPasswordWithOtp(ResetPasswordOtpDTO dto)
+        {
+            if (dto.NewPassword != dto.ConfirmPassword)
+            {
+                throw new Exception("Mật khẩu xác nhận không trùng khớp!");
+            }
+
+            var normalizedEmail = dto.Email.Trim().ToLower();
+            var cacheKey = $"otp_reset_{normalizedEmail}";
+
+            if (!_memoryCache.TryGetValue(cacheKey, out string? cachedOtp) || string.IsNullOrEmpty(cachedOtp))
+            {
+                throw new Exception("Mã OTP đã hết hạn hoặc không tồn tại. Vui lòng yêu cầu mã OTP mới!");
+            }
+
+            if (cachedOtp != dto.Otp.Trim())
+            {
+                throw new Exception("Mã OTP không chính xác. Vui lòng kiểm tra lại!");
+            }
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail && u.IsActive);
+            if (user == null)
+            {
+                throw new Exception("Không tìm thấy thông tin tài khoản hợp lệ!");
+            }
+
+            // Cập nhật mật khẩu mới đã băm bằng BCrypt
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            user.UpdatedAt = DateTime.Now;
+
+            _context.Users.Update(user);
+            await _context.SaveChangesAsync();
+
+            // Xóa mã OTP khỏi cache
+            _memoryCache.Remove(cacheKey);
+
+            return true;
         }
     }
 }
