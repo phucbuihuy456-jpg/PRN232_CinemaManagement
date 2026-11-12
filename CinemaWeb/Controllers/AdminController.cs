@@ -43,9 +43,169 @@ namespace CinemaWeb.Controllers
         // 2. Quản lý Phim (Dành cho Admin)
         [Authorize(Roles = "Admin")]
         [HttpGet]
-        public IActionResult Movies()
+        public async Task<IActionResult> Movies([FromQuery] string? search, [FromQuery] int? genreId)
         {
-            return View();
+            var model = new AdminMoviesListViewModel
+            {
+                SearchKeyword = search,
+                SelectedGenreId = genreId
+            };
+
+            try
+            {
+                // 1. Tải danh sách thể loại để lọc và hiển thị trong Modal Thêm/Sửa
+                model.Genres = await _movieApiClient.GetGenresAsync();
+
+                // 2. Tải danh sách phim qua OData
+                var movies = await _movieApiClient.GetMoviesFromODataAsync(genreId);
+
+                // 3. Lọc theo từ khóa tìm kiếm (tên phim, đạo diễn, diễn viên) nếu có
+                if (!string.IsNullOrWhiteSpace(search))
+                {
+                    var keyword = search.Trim().ToLower();
+                    movies = movies.Where(m =>
+                        (m.Title != null && m.Title.ToLower().Contains(keyword)) ||
+                        (m.Director != null && m.Director.ToLower().Contains(keyword)) ||
+                        (m.Cast != null && m.Cast.ToLower().Contains(keyword))
+                    ).ToList();
+                }
+
+                model.Movies = movies;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi tải danh sách phim cho Admin.");
+            }
+
+            return View(model);
+        }
+
+        /// <summary>
+        /// Lấy chi tiết 1 bộ phim theo ID để đổ vào Form Sửa (Admin).
+        /// GET: /Admin/GetMovieDetail/{id}
+        /// </summary>
+        [Authorize(Roles = "Admin")]
+        [HttpGet]
+        public async Task<IActionResult> GetMovieDetail(int id)
+        {
+            var client = _httpClientFactory.CreateClient();
+            try
+            {
+                var response = await client.GetAsync($"{_apiBaseUrl}/api/movies/{id}");
+                var content = await response.Content.ReadAsStringAsync();
+
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(content, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi tải chi tiết phim ID {Id}", id);
+                return StatusCode(500, new { message = "Lỗi kết nối khi tải chi tiết phim." });
+            }
+        }
+
+        /// <summary>
+        /// Tạo phim mới (Admin).
+        /// POST: /Admin/CreateMovie
+        /// </summary>
+        [Authorize(Roles = "Admin")]
+        [HttpPost]
+        public async Task<IActionResult> CreateMovie([FromBody] AdminMovieRequestModel request)
+        {
+            if (request == null)
+            {
+                return BadRequest(new { message = "Dữ liệu tạo phim không hợp lệ." });
+            }
+
+            var client = _httpClientFactory.CreateClient();
+            var token = User.FindFirst("JwtToken")?.Value;
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            try
+            {
+                var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
+                var response = await client.PostAsync($"{_apiBaseUrl}/api/movies", content);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(responseContent, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi gọi API tạo phim mới.");
+                return StatusCode(500, new { message = "Không thể kết nối đến máy chủ API để tạo phim." });
+            }
+        }
+
+        /// <summary>
+        /// Cập nhật thông tin phim (Admin).
+        /// POST / PUT: /Admin/UpdateMovie/{id}
+        /// </summary>
+        [Authorize(Roles = "Admin")]
+        [HttpPost]
+        [HttpPut]
+        public async Task<IActionResult> UpdateMovie(int id, [FromBody] AdminMovieRequestModel request)
+        {
+            if (request == null)
+            {
+                return BadRequest(new { message = "Dữ liệu cập nhật phim không hợp lệ." });
+            }
+
+            var client = _httpClientFactory.CreateClient();
+            var token = User.FindFirst("JwtToken")?.Value;
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            try
+            {
+                var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
+                var response = await client.PutAsync($"{_apiBaseUrl}/api/movies/{id}", content);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(responseContent, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi gọi API cập nhật phim ID {Id}", id);
+                return StatusCode(500, new { message = "Không thể kết nối đến máy chủ API để cập nhật phim." });
+            }
+        }
+
+        /// <summary>
+        /// Xóa mềm một bộ phim (Admin).
+        /// POST / DELETE: /Admin/DeleteMovie/{id}
+        /// </summary>
+        [Authorize(Roles = "Admin")]
+        [HttpPost]
+        [HttpDelete]
+        public async Task<IActionResult> DeleteMovie(int id)
+        {
+            var client = _httpClientFactory.CreateClient();
+            var token = User.FindFirst("JwtToken")?.Value;
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            try
+            {
+                var response = await client.DeleteAsync($"{_apiBaseUrl}/api/movies/{id}");
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                Response.StatusCode = (int)response.StatusCode;
+                return Content(responseContent, "application/json");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi gọi API xóa phim ID {Id}", id);
+                return StatusCode(500, new { message = "Không thể kết nối đến máy chủ API để xóa phim." });
+            }
         }
 
         // 3. Quản lý Suất chiếu (Admin & Staff)
