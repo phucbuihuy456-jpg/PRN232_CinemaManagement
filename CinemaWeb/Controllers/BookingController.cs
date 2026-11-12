@@ -28,6 +28,7 @@ namespace CinemaWeb.Controllers
         /// GET: /Booking/SeatMap/{id?}
         /// </summary>
         [HttpGet]
+        // Chỗ cần fix (1)
         public async Task<IActionResult> SeatMap(int? id)
         {
             int showtimeId = id ?? 1;

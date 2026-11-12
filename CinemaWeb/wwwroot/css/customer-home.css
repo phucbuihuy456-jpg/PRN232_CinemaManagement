@@ -149,3 +149,16 @@ body {
     border-bottom: 3px solid var(--cinema-primary);
     background: transparent;
 }
+
+/* Movie Poster Link & Detail Page */
+.movie-poster-link {
+    cursor: pointer;
+    text-decoration: none;
+    display: block;
+}
+
+.detail-poster-img {
+    aspect-ratio: 2/3;
+    object-fit: cover;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+}

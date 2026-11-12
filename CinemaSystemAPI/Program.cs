@@ -3,6 +3,7 @@ using CinemaSystemAPI.Middlewares;
 using CinemaSystemAPI.Models;
 using CinemaSystemAPI.Services;
 using CinemaSystemAPI.Services.Account;
+using CinemaSystemAPI.Services.Email;
 using CinemaSystemAPI.Services.Movies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.OData;
@@ -97,6 +98,9 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddAuthorization();
 
 // 5. Dependency Injection Services
+builder.Services.AddMemoryCache();
+builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("SmtpSettings"));
+builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddSingleton<JwtService>();
 builder.Services.AddSingleton<IQrCodeService, QrCodeService>();
 builder.Services.AddScoped<IAccountRepository, AccountRepository>();

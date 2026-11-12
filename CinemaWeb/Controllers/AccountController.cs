@@ -241,5 +241,189 @@ namespace CinemaWeb.Controllers
         {
             return View();
         }
+
+        // ==========================================
+        // 5. QUÊN MẬT KHẨU - GỬI MÃ OTP (FORGOT PASSWORD)
+        // ==========================================
+        [HttpGet]
+        public IActionResult ForgotPassword()
+        {
+            if (User.Identity != null && User.Identity.IsAuthenticated)
+            {
+                return RedirectToAction("Index", "Home");
+            }
+            return View();
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ForgotPassword(ForgotPasswordViewModel model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                var jsonContent = new StringContent(
+                    JsonSerializer.Serialize(new { email = model.Email }),
+                    Encoding.UTF8,
+                    "application/json");
+
+                var response = await client.PostAsync($"{_apiBaseUrl}/api/Auth/forgot-password", jsonContent);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    TempData["SuccessMessage"] = "Mã xác thực OTP đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư!";
+                    return RedirectToAction("ResetPassword", new { email = model.Email });
+                }
+                else
+                {
+                    var errorResponse = await response.Content.ReadAsStringAsync();
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(errorResponse);
+                        if (doc.RootElement.TryGetProperty("message", out var msg))
+                        {
+                            ModelState.AddModelError(string.Empty, msg.GetString() ?? "Không thể gửi mã OTP.");
+                        }
+                        else
+                        {
+                            ModelState.AddModelError(string.Empty, "Email không tồn tại trong hệ thống!");
+                        }
+                    }
+                    catch
+                    {
+                        ModelState.AddModelError(string.Empty, "Không thể gửi mã OTP. Vui lòng thử lại!");
+                    }
+                    return View(model);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi gọi API Quên mật khẩu");
+                ModelState.AddModelError(string.Empty, "Không thể kết nối đến máy chủ. Vui lòng thử lại sau!");
+                return View(model);
+            }
+        }
+
+        // ==========================================
+        // 6. XÁC THỰC OTP & ĐẶT LẠI MẬT KHẨU (RESET PASSWORD)
+        // ==========================================
+        [HttpGet]
+        public IActionResult ResetPassword(string? email)
+        {
+            if (User.Identity != null && User.Identity.IsAuthenticated)
+            {
+                return RedirectToAction("Index", "Home");
+            }
+
+            if (string.IsNullOrEmpty(email))
+            {
+                return RedirectToAction("ForgotPassword");
+            }
+
+            return View(new ResetPasswordOtpViewModel { Email = email });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ResetPassword(ResetPasswordOtpViewModel model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                var requestBody = new
+                {
+                    email = model.Email,
+                    otp = model.Otp.Trim(),
+                    newPassword = model.NewPassword,
+                    confirmPassword = model.ConfirmPassword
+                };
+
+                var jsonContent = new StringContent(
+                    JsonSerializer.Serialize(requestBody),
+                    Encoding.UTF8,
+                    "application/json");
+
+                var response = await client.PostAsync($"{_apiBaseUrl}/api/Auth/reset-password", jsonContent);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    TempData["SuccessMessage"] = "Đặt lại mật khẩu thành công! Bạn có thể đăng nhập ngay bây giờ.";
+                    return RedirectToAction("Login");
+                }
+                else
+                {
+                    var errorResponse = await response.Content.ReadAsStringAsync();
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(errorResponse);
+                        if (doc.RootElement.TryGetProperty("message", out var msg))
+                        {
+                            ModelState.AddModelError(string.Empty, msg.GetString() ?? "Đặt lại mật khẩu thất bại.");
+                        }
+                        else
+                        {
+                            ModelState.AddModelError(string.Empty, "Mã OTP không đúng hoặc đã hết hạn.");
+                        }
+                    }
+                    catch
+                    {
+                        ModelState.AddModelError(string.Empty, "Đặt lại mật khẩu không thành công. Vui lòng kiểm tra lại OTP.");
+                    }
+                    return View(model);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi gọi API Đặt lại mật khẩu");
+                ModelState.AddModelError(string.Empty, "Không thể kết nối đến máy chủ. Vui lòng thử lại sau!");
+                return View(model);
+            }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ResendOtp(string email)
+        {
+            if (string.IsNullOrEmpty(email))
+            {
+                return RedirectToAction("ForgotPassword");
+            }
+
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                var jsonContent = new StringContent(
+                    JsonSerializer.Serialize(new { email }),
+                    Encoding.UTF8,
+                    "application/json");
+
+                var response = await client.PostAsync($"{_apiBaseUrl}/api/Auth/forgot-password", jsonContent);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    TempData["SuccessMessage"] = "Mã OTP mới đã được gửi vào email của bạn!";
+                }
+                else
+                {
+                    TempData["ErrorMessage"] = "Không thể gửi lại mã OTP. Vui lòng thử lại sau ít phút.";
+                }
+            }
+            catch
+            {
+                TempData["ErrorMessage"] = "Lỗi kết nối máy chủ. Vui lòng thử lại!";
+            }
+
+            return RedirectToAction("ResetPassword", new { email });
+        }
     }
 }

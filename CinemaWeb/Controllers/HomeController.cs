@@ -79,5 +79,24 @@ namespace CinemaWeb.Controllers
                 comingSoon
             });
         }
+
+        [HttpGet]
+        public async Task<IActionResult> Detail(int id)
+        {
+            var movie = await _movieApiClient.GetMovieByIdAsync(id);
+            if (movie == null)
+            {
+                // Fallback nếu API /api/movies/{id} chưa sẵn sàng: lấy từ OData
+                var movies = await _movieApiClient.GetMoviesFromODataAsync();
+                movie = movies.FirstOrDefault(m => m.Id == id);
+            }
+
+            if (movie == null)
+            {
+                return NotFound();
+            }
+
+            return View(movie);
+        }
     }
 }
